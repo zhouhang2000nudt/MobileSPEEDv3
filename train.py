@@ -78,7 +78,7 @@ if __name__ == "__main__":
     comet_logger = CometLogger(
         api_key=config["comet_api"],
         save_dir=dirpath,
-        project_name="Mobile_SPEEDNet",
+        project_name="MobileSPEEDv3",
         experiment_name=config["name"] + "-" + time.strftime('%Y-%m-%d %H:%M:%S', time.localtime()),
         offline=config["offline"]
     )
