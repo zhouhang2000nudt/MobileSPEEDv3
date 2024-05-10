@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 from typing import List, Union
 from .RepVGG import RepVGGplusBlock
@@ -146,10 +147,10 @@ class FPNPAN(nn.Module):
         
         # 上采样通路
         if self.fuse_mode == "cat":
-            p4_fused_up = self.p4_fuseconv_up(torch.cat([self.UpSample(p5_fused), p4], dim=1)) # 112, 30, 48
+            p4_fused_up = self.p4_fuseconv_up(torch.cat([F.interpolate(p5_fused, size=p4.shape[2:], mode="bilinear", align_corners=True), p4], dim=1)) # 112, 30, 48
         
         if self.fuse_mode == "cat":
-            p3_fused_up = self.p3_fuseconv_up(torch.cat([self.UpSample(p4_fused_up), p3], dim=1)) # 40, 60, 96    out
+            p3_fused_up = self.p3_fuseconv_up(torch.cat([F.interpolate(p4_fused_up, size=p3.shape[2:], mode="bilinear", align_corners=True), p3], dim=1)) # 40, 60, 96    out
         
         # 下采样通路
         if self.fuse_mode == "cat":
