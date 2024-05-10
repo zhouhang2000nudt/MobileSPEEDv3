@@ -63,15 +63,13 @@ def prepare_Speed(config: dict):
             ]),
             "A_transform": A.Compose([
                 A.OneOf([
-                    A.AdvancedBlur(blur_limit=5,
-                                   sigmaX_limit=(0.1,1.5),
-                                   sigmaY_limit=(0.1,1.5),
+                    A.AdvancedBlur(blur_limit=(3, 5),
                                    rotate_limit=25,
                                    p=0.1),
                     A.Blur(blur_limit=(3, 5), p=0.1),
                     A.GaussNoise(var_limit=(5, 15),
                                  p=0.1),
-                    A.GaussianBlur(blur_limit=5,
+                    A.GaussianBlur(blur_limit=(3, 5),
                                    sigma_limit=1.5,
                                    p=0.1),
                     ], p=0.1),
