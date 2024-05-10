@@ -173,20 +173,20 @@ class Head(nn.Module):
     def __init__(self, in_features: int, pos_dim: int, ori_dim: int, num_classes: int = 16):
         super(Head, self).__init__()
         self.pos_fc = nn.Sequential(
-            nn.Linear(in_features, in_features // 4),
+            nn.Linear(in_features, in_features // 8),
             nn.ReLU(inplace=True),
-            nn.Linear(in_features // 4, pos_dim)
+            nn.Linear(in_features // 8, pos_dim)
         )
         self.ori_fc = nn.Sequential(
-            nn.Linear(in_features, in_features // 2),
+            nn.Linear(in_features, in_features // 4),
             nn.ReLU(inplace=True),
-            nn.Linear(in_features // 2, ori_dim),
+            nn.Linear(in_features // 4, ori_dim),
             nn.Softmax(dim=1)
         )
         self.cls_fc = nn.Sequential(
-            nn.Linear(in_features, in_features),
+            nn.Linear(in_features, in_features // 2),
             nn.ReLU(inplace=True),
-            nn.Linear(in_features, num_classes),
+            nn.Linear(in_features // 2, num_classes),
             nn.Softmax(dim=1)
         )
     
