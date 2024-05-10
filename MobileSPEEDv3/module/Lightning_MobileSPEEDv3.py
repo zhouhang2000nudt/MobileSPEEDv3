@@ -8,7 +8,7 @@ from torch.optim import SGD, AdamW
 
 from ..model.Mobile_SPPEDv3 import Mobile_SPEEDv3
 from ..utils.loss import PoseLoss, OriValLoss, OriFaceLoss
-from ..utils.metrics import Loss, PosError, OriError
+from ..utils.metrics import Loss, PosError, OriError, Score
 from ..utils.dataset import Speed
 
 
@@ -37,6 +37,7 @@ class LightningMobileSPEEDv3(L.LightningModule):
         self.val_loss: Loss = Loss()
         self.ori_error: OriError = OriError()
         self.pos_error: PosError = PosError()
+        self.score: Score = Score(self.config["ALPHA"])
         self.save_hyperparameters()
         if self.config["save_csv"]:
             self.result = [["file_name",
@@ -136,6 +137,7 @@ class LightningMobileSPEEDv3(L.LightningModule):
             with open("result.csv", "w", encoding="utf-8") as csv_file:
                 csv_writer = csv.writer(csv_file)
                 csv_writer.writerows(self.result)
+        self.score.update(self.ori_error.compute(), self.pos_error.compute(), on_epoch=True)
         self.metric_dict = {
             "val/pos_loss": self.val_pos_loss.compute(),
             "val/ori_loss": self.val_ori_loss.compute(),
@@ -143,6 +145,7 @@ class LightningMobileSPEEDv3(L.LightningModule):
             "val/loss": self.val_loss.compute(),
             "val/ori_error(deg)": self.ori_error.compute(),
             "val/pos_error(m)": self.pos_error.compute(),
+            "val/score": self.score.compute(),
         }
         self.log_dict(self.metric_dict, on_epoch=True)
         rich.print(f"[b]{'val':<5} Epoch {self.current_epoch:>3}/{self.trainer.max_epochs:<3} pos_loss: {self.val_pos_loss.compute().item():<8.4f}  ori_loss: {self.val_ori_loss.compute().item():<8.4f}  cls_loss: {self.val_cls_loss.compute().item():<8.4f}  loss: {self.val_loss.compute().item():<8.4f}  pos_error(m): {self.pos_error.compute().item():<8.4f}  ori_error(deg): {self.ori_error.compute().item():<8.4f}")

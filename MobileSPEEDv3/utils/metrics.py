@@ -1,6 +1,7 @@
 import torch
 from torch import Tensor
 from torchmetrics import Metric
+from typing import List
 
 class Loss(Metric):
     # 计算总Loss
@@ -22,7 +23,7 @@ class Loss(Metric):
 
 
 class PosError(Metric):
-    # 计算position score的类
+    # 计算position error的类
     is_differentiable = True
     full_state_update = False
     higher_is_better = False
@@ -41,7 +42,7 @@ class PosError(Metric):
 
 
 class OriError(Metric):
-    # 计算ori score的类
+    # 计算ori error的类
     is_differentiable = True
     full_state_update = False
     higher_is_better = False
@@ -64,6 +65,24 @@ class OriError(Metric):
     
     def compute(self) -> Tensor:
         return self.ori_error / self.num
+
+
+class Score(Metric):
+    # 计算综合得分的类
+    is_differentiable = True
+    full_state_update = False
+    higher_is_better = False
+    
+    def __init__(self, ALPHA: List[float, float]):
+        super().__init__()
+        self.add_state("score", default=torch.tensor(0.0), dist_reduce_fx="sum")
+        self.ALPHA = ALPHA
+    
+    def update(self, ori_error: Tensor, pos_error: Tensor):
+        self.score += self.ALPHA[0] * pos_error + self.ALPHA[1] * ori_error
+    
+    def compute(self) -> Tensor:
+        return self.score
 
 
 if __name__ == "__main__":

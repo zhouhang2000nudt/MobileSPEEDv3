@@ -46,7 +46,7 @@ if __name__ == "__main__":
     # 保存模型
     checkpoint = ModelCheckpoint(dirpath=dirpath,
                                  filename="{epoch}-best",
-                                 monitor="val/loss",
+                                 monitor="val/score",
                                  verbose=True,
                                  save_last=True,
                                  mode="min")
