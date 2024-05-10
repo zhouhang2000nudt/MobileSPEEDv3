@@ -10,7 +10,7 @@ benchmark: true        # 是否加速，和deterministic不可同时为True，de
 debug: false             # 是否为debug模式
 limit_train_val: [0.1, 0.5]  # 用于debug时的训练部分和测试部分比例
 comet_api: agcu7oeqU395peWf6NCNqnTa7
-offline: true          # 是否离线训练
+offline: false          # 是否离线训练
 save_csv: false
 train: true
 val: true
@@ -18,7 +18,7 @@ val: true
 
 # =========================dataset=========================
 data_dir: ../datasetsv3/speed     # 数据路径
-workers: 2            # dataloader workers
+workers: 16            # dataloader workers
 ram: false            # 是否使用内存加载数据
 imgsz: [480, 768]     # 图片大小 [h, w]
 
@@ -38,7 +38,7 @@ lr0: 0.001            # 初始学习率
 momentum: 0.937       # 动量
 weight_decay: 0.01    # 权重衰减
 epoch: 200            # 训练轮数
-batch_size: 20        # 批次大小
+batch_size: 30        # 批次大小
 precision: mix        # 训练精度 half/mix/double/full/int8
 accumulate_grad_batches: 1            # 累计梯度批次
 lr_scheduler: WarmupCosineAnnealingLR # 学习率调度器 WarmupCosineAnnealingLR/ReduceLROnPlateau/MultiStepLR
