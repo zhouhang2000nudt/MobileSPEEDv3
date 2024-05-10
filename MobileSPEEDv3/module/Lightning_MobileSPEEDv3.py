@@ -137,7 +137,7 @@ class LightningMobileSPEEDv3(L.LightningModule):
             with open("result.csv", "w", encoding="utf-8") as csv_file:
                 csv_writer = csv.writer(csv_file)
                 csv_writer.writerows(self.result)
-        self.score.update(self.ori_error.compute(), self.pos_error.compute(), on_epoch=True)
+        self.score.update(self.ori_error.compute(), self.pos_error.compute())
         self.metric_dict = {
             "val/pos_loss": self.val_pos_loss.compute(),
             "val/ori_loss": self.val_ori_loss.compute(),
@@ -155,6 +155,7 @@ class LightningMobileSPEEDv3(L.LightningModule):
         self.val_loss.reset()
         self.ori_error.reset()
         self.pos_error.reset()
+        self.score.reset()
     
     def on_fit_end(self):
         self.logger.experiment.log_asset(self.trainer.callbacks[3].best_model_path, overwrite=True)

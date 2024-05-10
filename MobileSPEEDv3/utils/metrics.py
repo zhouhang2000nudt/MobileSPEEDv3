@@ -73,13 +73,13 @@ class Score(Metric):
     full_state_update = False
     higher_is_better = False
     
-    def __init__(self, ALPHA: List[float, float]):
+    def __init__(self, ALPHA: List[float]):
         super().__init__()
         self.add_state("score", default=torch.tensor(0.0), dist_reduce_fx="sum")
         self.ALPHA = ALPHA
     
     def update(self, ori_error: Tensor, pos_error: Tensor):
-        self.score += self.ALPHA[0] * pos_error + self.ALPHA[1] * ori_error
+        self.score = self.ALPHA[0] * pos_error + self.ALPHA[1] * ori_error
     
     def compute(self) -> Tensor:
         return self.score
