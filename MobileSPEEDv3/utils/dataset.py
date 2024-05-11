@@ -5,6 +5,7 @@ from threading import Thread
 from tqdm import tqdm
 from numpy import ndarray
 from .utils import rotate_image, rotate_cam, Camera
+from PIL import Image
 
 import albumentations as A
 import cv2 as cv
@@ -53,6 +54,8 @@ def prepare_Speed(config: dict):
     Speed.data_dir = Path(config["data_dir"])
     Speed.image_dir = Speed.data_dir / "images"
     Speed.label_file = Speed.data_dir / "labels.json"
+    Speed.test_img_dir = Speed.data_dir / "test"
+    Speed.real_test_img_dir = Speed.data_dir / "real_test"
 
     # 设置transform
     Speed.transform = {
@@ -98,16 +101,20 @@ def prepare_Speed(config: dict):
             "transform": v2.Compose([
                 v2.ToTensor(),
             ]),
-            "A_transform": A.Compose([
-                A.Blur(blur_limit=0, p=0.0)
-            ],
-            p=0.0,
-            bbox_params=A.BboxParams(format="pascal_voc", label_fields=["category_ids"]))
+            "A_transform": None,
+        },
+        "test": {
+            "transform": v2.Compose([
+                v2.ToTensor(),
+            ]),
+            "A_transform": None,
         }
     }
 
     # 设置标签字典
     Speed.labels = json.load(open(Speed.label_file, "r"))
+    Speed.test_labels = json.load(open(Speed.data_dir / "test.json", "r"))
+    Speed.test_labels.extend(json.load(open(Speed.data_dir / "real_test.json", "r")))
     
     # 采样列表
     Speed.img_name = list(Speed.labels.keys())
@@ -115,6 +122,7 @@ def prepare_Speed(config: dict):
     train_num = int(num * Speed.config["split"][0])
     val_num = num - train_num
     Speed.train_index, Speed.val_index = random_split(Speed.img_name, [train_num, val_num])
+    # Speed.test_index = list(Speed.test_labels.keys())
 
     # 缓存图片
     if Speed.config["ram"]:
@@ -157,12 +165,14 @@ class Speed(Dataset):
     image_dir: Path         # 图片目录
     po_file: Path           # 位姿json文件
     bbox_file: Path         # bbox json文件
-    labels: dict   # 标签字典
+    labels: dict            # 标签字典
+    test_labels: dict       # 测试集标签字典
     config: dict            # 配置字典
     img_name: list     # 样本id列表
     transform: dict   # 数据转化方法字典
     train_index: Subset     # 训练集图片名列表
     val_index: Subset       # 验证集图片名列表
+    test_index: list        # 测试集图片名列表
     img_dict: dict = {} # 图片字典
     fake_img: ndarray       # 伪图片
     camera: Camera = Camera
@@ -173,48 +183,57 @@ class Speed(Dataset):
     def __init__(self, mode: str = "train"):
         self.A_transform = Speed.transform[mode]["A_transform"]
         self.transform = Speed.transform[mode]["transform"]
-        self.sample_index = Speed.train_index if mode == "train" else Speed.val_index
+        self.sample_index = Speed.train_index if mode == "train" else Speed.val_index if mode == "val" else Speed.test_index
         self.mode = mode
     
     def __len__(self):
         return len(self.sample_index)
 
     def __getitem__(self, index) -> tuple:
-        filename = self.sample_index[index].strip()         # 图片文件名
-        filename = "img000001.jpg"
+        filename = self.sample_index[index].strip()                  # 图片文件名
         if Speed.config["ram"]:
             image = Speed.img_dict[filename]                         # 伪图片
         else:
             image = cv.imread(str(self.image_dir / filename.replace(".jpg", ".png")), cv.IMREAD_GRAYSCALE)   # 读取图片
         
-        ori = torch.tensor(self.labels[filename]["ori"])   # 姿态  (,4)
-        pos = torch.tensor(self.labels[filename]["pos"])   # 位置  (,3)
+        if self.mode != "test":
+            ori = torch.tensor(self.labels[filename]["ori"])   # 姿态  (,4)
+            pos = torch.tensor(self.labels[filename]["pos"])   # 位置  (,3)
+            
+            bbox = self.labels[filename]["bbox"]
+            # 进行Albumentation增强
+            if self.A_transform is not None:
+                transformed = self.A_transform(image=image, bboxes=[bbox], category_ids=[1])
+                image = transformed["image"]
         
-        bbox = self.labels[filename]["bbox"]
-        # 进行Albumentation增强
-        transformed = self.A_transform(image=image, bboxes=[bbox], category_ids=[1])
-        image = transformed["image"]
-        
-        dice = np.random.rand(1)
-        if self.mode == "train":
-            if Speed.config["Rotate"]["Rotate_img"] and dice <= Speed.config["Rotate"]["p"]:
-                image, pos, ori = rotate_image(image, pos, ori, Speed.camera.K, Speed.config["Rotate"]["img_angle"])                  # bbox (1, 4)
-            elif Speed.config["Rotate"]["Rotate_cam"] and dice > Speed.config["Rotate"]["p"]:
-                image, pos, ori = rotate_cam(image, pos, ori, Speed.camera.K, Speed.config["Rotate"]["cam_angle"])
+            dice = np.random.rand(1)
+            if self.mode == "train":
+                if Speed.config["Rotate"]["Rotate_img"] and dice <= Speed.config["Rotate"]["p"]:
+                    image, pos, ori = rotate_image(image, pos, ori, Speed.camera.K, Speed.config["Rotate"]["img_angle"])                  # bbox (1, 4)
+                elif Speed.config["Rotate"]["Rotate_cam"] and dice > Speed.config["Rotate"]["p"]:
+                    image, pos, ori = rotate_cam(image, pos, ori, Speed.camera.K, Speed.config["Rotate"]["cam_angle"])
+            
+            cls = torch.tensor(self.encode_dict[tuple((ori >= 0).tolist())])
+            ori = ori ** 2
+            
+            y: dict = {
+                "filename": filename,
+                "pos": pos,
+                "ori": ori,
+                "cls": cls,
+            }
+        else:
+            y: dict = {
+                "filename": filename,
+            }
 
+        # resize
+        image = Image.fromarray(image)
+        image = image.resize((Speed.config["imgsz"][1], Speed.config["imgsz"][0]))
+        
         # 使用torchvision转换图片
         image = self.transform(image)       # (1, 480, 768)
         # image = image.repeat(3, 1, 1)       # (3, 480, 768)
-        
-        cls = torch.tensor(self.encode_dict[tuple((ori >= 0).tolist())])
-        ori = ori ** 2
-            
-        y: dict = {
-            "filename": filename,
-            "pos": pos,
-            "ori": ori,
-            "cls": cls,
-        }
 
         return image, y
 
