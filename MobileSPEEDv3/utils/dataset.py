@@ -113,8 +113,8 @@ def prepare_Speed(config: dict):
 
     # 设置标签字典
     Speed.labels = json.load(open(Speed.label_file, "r"))
-    Speed.test_labels = json.load(open(Speed.data_dir / "test.json", "r"))
-    Speed.test_labels.extend(json.load(open(Speed.data_dir / "real_test.json", "r")))
+    # Speed.test_labels = json.load(open(Speed.data_dir / "test.json", "r"))
+    # Speed.test_labels.extend(json.load(open(Speed.data_dir / "real_test.json", "r")))
     
     # 采样列表
     Speed.img_name = list(Speed.labels.keys())
