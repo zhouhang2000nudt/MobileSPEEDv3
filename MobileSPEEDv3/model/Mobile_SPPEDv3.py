@@ -44,15 +44,15 @@ class Mobile_SPEEDv3(nn.Module):
                                      ori_dim=ori_dim,)
         
     def forward(self, x: Tensor):
-        ins_feat = x # 当前实例特征tensor
-        # 生成从-1到1的线性值
-        x_range = torch.linspace(-1, 1, ins_feat.shape[-1], device=ins_feat.device)
-        y_range = torch.linspace(-1, 1, ins_feat.shape[-2], device=ins_feat.device)
-        y, x = torch.meshgrid(y_range, x_range, indexing='ij') # 生成二维坐标网格
-        y = y.expand([ins_feat.shape[0], 1, -1, -1]) # 扩充到和ins_feat相同维度
-        x = x.expand([ins_feat.shape[0], 1, -1, -1])
-        coord_feat = torch.cat([x, y], 1) # 位置特征
-        x = torch.cat([x, coord_feat], 1) # concatnate一起作为下一个卷积的输入
+        # ins_feat = x # 当前实例特征tensor
+        # # 生成从-1到1的线性值
+        # x_range = torch.linspace(-1, 1, ins_feat.shape[-1], device=ins_feat.device)
+        # y_range = torch.linspace(-1, 1, ins_feat.shape[-2], device=ins_feat.device)
+        # y, x = torch.meshgrid(y_range, x_range, indexing='ij') # 生成二维坐标网格
+        # y = y.expand([ins_feat.shape[0], 1, -1, -1]) # 扩充到和ins_feat相同维度
+        # x = x.expand([ins_feat.shape[0], 1, -1, -1])
+        # coord_feat = torch.cat([x, y], 1) # 位置特征
+        # x = torch.cat([x, coord_feat], 1) # concatnate一起作为下一个卷积的输入
         p3 = self.features[:7](x)
         p4 = self.features[7:13](p3)
         p5 = self.features[13:](p4)

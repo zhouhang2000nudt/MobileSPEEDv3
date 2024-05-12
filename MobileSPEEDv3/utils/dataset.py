@@ -233,7 +233,7 @@ class Speed(Dataset):
         
         # 使用torchvision转换图片
         image = self.transform(image)       # (1, 480, 768)
-        # image = image.repeat(3, 1, 1)       # (3, 480, 768)
+        image = image.repeat(3, 1, 1)       # (3, 480, 768)
 
         return image, y
 
