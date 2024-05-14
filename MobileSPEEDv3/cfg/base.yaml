@@ -10,7 +10,7 @@ benchmark: true        # 是否加速，和deterministic不可同时为True，de
 debug: false             # 是否为debug模式
 limit_train_val: [0.1, 0.1]  # 用于debug时的训练部分和测试部分比例
 comet_api: agcu7oeqU395peWf6NCNqnTa7
-offline: true          # 是否离线训练
+offline: false          # 是否离线训练
 save_csv: false
 train: true
 val: true
@@ -67,6 +67,6 @@ milestones: [30, 60]  # 学习率衰减里程碑
 Rotate:
   Rotate_img: true
   Rotate_cam: true
-  img_angle: 45
+  img_angle: 50
   cam_angle: 0
   p: 0.5             # p为图片旋转的概率，(1-p)为相机旋转的概率
