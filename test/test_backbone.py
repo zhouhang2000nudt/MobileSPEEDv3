@@ -22,6 +22,7 @@ def profile_model(model):
 print(timm.list_models("*mobilenet*"))
 
 timm_model = timm.create_model("mobilenetv3_large_100", pretrained=False, features_only=True, out_indices=(2, 3, 4))
+print(timm_model.default_cfg)
 profile_model(timm_model)
 print(timm_model)
 print(timm_model.feature_info.channels())

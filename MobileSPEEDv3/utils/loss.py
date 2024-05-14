@@ -29,7 +29,7 @@ def CrossEntropy_Loss(pre: Tensor, label: Tensor):
     return torch.mean(torch.sum(-label * torch.log(pre), dim=1))
 
 @torch.jit.script
-def Focal_Loss(pre: Tensor, label: Tensor, gamma: float = 2.0, alpha: float = 1.0):
+def Focal_Loss(pre: Tensor, label: Tensor, gamma: float = 2.0, alpha: float = 0.25):
     eps = 1e-7
     CE = -label * torch.log(pre + eps)
     FLoss = alpha * torch.pow(1 - pre, gamma) * CE

@@ -4,7 +4,7 @@ from pathlib import Path
 from threading import Thread
 from tqdm import tqdm
 from numpy import ndarray
-from .utils import rotate_image, rotate_cam, Camera
+from .utils import rotate_image, rotate_cam, Camera, warp_boxes, bbox_in_image
 from PIL import Image
 
 import albumentations as A
@@ -204,13 +204,23 @@ class Speed(Dataset):
             if self.A_transform is not None:
                 transformed = self.A_transform(image=image, bboxes=[bbox], category_ids=[1])
                 image = transformed["image"]
+                bbox = list(transformed["bboxes"][0])
         
             dice = np.random.rand(1)
-            if self.mode == "train":
-                if Speed.config["Rotate"]["Rotate_img"] and dice <= Speed.config["Rotate"]["p"]:
-                    image, pos, ori = rotate_image(image, pos, ori, Speed.camera.K, Speed.config["Rotate"]["img_angle"])                  # bbox (1, 4)
-                elif Speed.config["Rotate"]["Rotate_cam"] and dice > Speed.config["Rotate"]["p"]:
-                    image, pos, ori = rotate_cam(image, pos, ori, Speed.camera.K, Speed.config["Rotate"]["cam_angle"])
+            if self.mode == "train" and (Speed.config["Rotate"]["Rotate_img"] or Speed.config["Rotate"]["Rotate_cam"]):
+                wrapped_time = 0
+                bbox_area = (bbox[2] - bbox[0]) * (bbox[3] - bbox[1])
+                while wrapped_time == 0 or not bbox_in_image(bbox_wrapped, bbox_area):
+                    wrapped_time += 1
+                    if Speed.config["Rotate"]["Rotate_img"] and dice <= Speed.config["Rotate"]["p"]:
+                        image, pos, ori, M = rotate_image(image, pos, ori, Speed.camera.K, Speed.config["Rotate"]["img_angle"])                  # bbox (1, 4)
+                    elif Speed.config["Rotate"]["Rotate_cam"] and dice > Speed.config["Rotate"]["p"]:
+                        image, pos, ori, M = rotate_cam(image, pos, ori, Speed.camera.K, Speed.config["Rotate"]["cam_angle"])
+                    bbox_wrapped = warp_boxes(np.array([bbox]), M, height=Speed.config["imgsz"][0], width=Speed.config["imgsz"][1]).tolist()[0]
+                    if wrapped_time > 10:
+                        break
+                if bbox_in_image(bbox_wrapped, bbox_area):
+                    bbox = bbox_wrapped
             
             cls = torch.tensor(self.encode_dict[tuple((ori >= 0).tolist())])
             if Speed.config["cls_dim"] > 16:

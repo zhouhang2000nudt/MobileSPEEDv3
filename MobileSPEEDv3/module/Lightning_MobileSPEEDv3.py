@@ -99,7 +99,6 @@ class LightningMobileSPEEDv3(L.LightningModule):
         # 取出数据
         inputs, labels = batch
         num = inputs.shape[0]
-        inputs = inputs.to(self.model.features[0][0].weight.dtype)
         # 前向传播
         pos, ori, cls = self(inputs)
         pos = pos.clone()

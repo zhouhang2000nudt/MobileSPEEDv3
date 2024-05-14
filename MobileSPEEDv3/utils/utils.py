@@ -65,8 +65,12 @@ def rotate_cam(image, t, q, K, magnitude):
     t_new = np.array(np.matrix(t)*R_change.T)[0]
     q_change = se3lib.SO32quat(R_change)
     q_new = np.array(se3lib.quat_mult(q_change, q))[0]
+    
+    # trans to tensor
+    t_new = torch.tensor(t_new, dtype=torch.float32)
+    q_new = torch.tensor(q_new, dtype=torch.float32)
 
-    return image_warped, t_new, q_new
+    return image_warped, t_new, q_new, M
 
 def rotate_image(image, t, q, K, magnitude):
     """ Apply warping corresponding to a random in-plane rotation
@@ -99,7 +103,7 @@ def rotate_image(image, t, q, K, magnitude):
     t_new = torch.tensor(t_new, dtype=torch.float32)
     q_new = torch.tensor(q_new, dtype=torch.float32)
 
-    return image_warped, t_new, q_new
+    return image_warped, t_new, q_new, M
 
 def warp_boxes(boxes, M, width, height):
     n = len(boxes)
@@ -144,6 +148,12 @@ def warp_boxes(boxes, M, width, height):
         return xy.astype(np.float32)
     else:
         return boxes
+
+
+def bbox_in_image(bbox_wrapped, bbox_area):
+    # 若bbox_wrapped的面积小于原来bbox面积的0.5，就认为bbox_wrapped不在图像内
+    bbox_wrapped_area = (bbox_wrapped[2] - bbox_wrapped[0]) * (bbox_wrapped[3] - bbox_wrapped[1])
+    return bbox_wrapped_area > 0.7 * bbox_area
 
 
 def clamp(bbox):

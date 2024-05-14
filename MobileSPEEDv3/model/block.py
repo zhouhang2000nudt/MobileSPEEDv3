@@ -174,12 +174,13 @@ class RepFConvHead(nn.Module):
                 stride=1,
                 padding=1
             ),
-            RepVGGplusBlock(
+            nn.Conv2d(
                 in_channels=in_channels // 8,
                 out_channels=pos_dim,
                 kernel_size=3,
                 stride=1,
-                padding=1
+                padding=1,
+                bias=False
             ),
             nn.AdaptiveAvgPool2d((1, 1))
         )
@@ -191,12 +192,13 @@ class RepFConvHead(nn.Module):
                 stride=1,
                 padding=1
             ),
-            RepVGGplusBlock(
+            nn.Conv2d(
                 in_channels=in_channels // 8,
                 out_channels=ori_dim,
                 kernel_size=3,
                 stride=1,
-                padding=1
+                padding=1,
+                bias=False
             ),
             nn.AdaptiveAvgPool2d((1, 1))
         )
@@ -208,20 +210,21 @@ class RepFConvHead(nn.Module):
                 stride=1,
                 padding=1
             ),
-            RepVGGplusBlock(
+            nn.Conv2d(
                 in_channels=in_channels // 8,
                 out_channels=cls_dim,
                 kernel_size=3,
                 stride=1,
-                padding=1
+                padding=1,
+                bias=False
             ),
             nn.AdaptiveAvgPool2d((1, 1))
         )
     
     def forward(self, x):
         pos = self.pos_fconv(x).squeeze(-1).squeeze(-1)
-        ori = F.softmax(self.ori_fconv(x).squeeze(-1).squeeze(-1), dim=-1)
-        cls = F.softmax(self.cls_fconv(x).squeeze(-1).squeeze(-1), dim=-1)
+        ori = F.softmax(self.ori_fconv(x).squeeze(-1).squeeze(-1), dim=1)
+        cls = F.softmax(self.cls_fconv(x).squeeze(-1).squeeze(-1), dim=1)
         return pos, ori, cls
 
 class RepECPHead(nn.Sequential):

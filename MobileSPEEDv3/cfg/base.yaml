@@ -8,7 +8,7 @@ summary: rich           # 模型总结 rich/default
 deterministic: false     # 是否可复现
 benchmark: true        # 是否加速，和deterministic不可同时为True，deterministic为True时，benchmark参数无效
 debug: false             # 是否为debug模式
-limit_train_val: [0.1, 0.5]  # 用于debug时的训练部分和测试部分比例
+limit_train_val: [0.1, 0.1]  # 用于debug时的训练部分和测试部分比例
 comet_api: agcu7oeqU395peWf6NCNqnTa7
 offline: true          # 是否离线训练
 save_csv: false
@@ -26,9 +26,9 @@ imgsz: [480, 768]     # 图片大小 [h, w]
 # ==========================model==========================
 pos_dim: 3                             # 位置维度
 ori_dim: 4                             # 姿态维度
-cls_dim: 20                           # 分类维度
+cls_dim: 16                           # 分类维度
 backbone: "mobilenetv3_large_100"          # 模型名
-pretrained: False
+pretrained: true
 neck: FPNPAN                            # FPNPAN/BiFPN/AFPN
 out_channels: [40, 60, 80]                       # neck输出通道数
 RepECPHead_expand_ratio: [1.2, 1, 0.8]                 # 扩张率
@@ -38,7 +38,7 @@ ALPHA: [1, 2]                       # Score = ALPHA[0] * POS_Error + ALPHA[1] * 
 BETA: [1.2, 8, 10]                  # Loss = BETA[0] * POS_LOSS + BETA[1] * ORI_LOSS + BETA[2] * CLS_LOSS
 pos_loss: MSE                       # 位置损失函数 MAE/MSE/Huber/Log_Cosh (regression loss)
 ori_loss: CrossEntropy              # 姿态值损失函数 CrossEntropy/Focal
-cls_loss: CrossEntropy              # 分类损失函数 CrossEntropy/Focal
+cls_loss: Focal              # 分类损失函数 CrossEntropy/Focal
 
 # ==========================train==========================
 optimizer: AdamW       # 优化器 Adam/SGD/AdamW
@@ -46,7 +46,7 @@ lr0: 0.001            # 初始学习率
 momentum: 0.937       # 动量
 weight_decay: 0.01    # 权重衰减
 epoch: 200            # 训练轮数
-batch_size: 10        # 批次大小
+batch_size: 48        # 批次大小
 precision: mix        # 训练精度 half/mix/double/full/int8
 accumulate_grad_batches: 1            # 累计梯度批次
 lr_scheduler: WarmupCosineAnnealingLR # 学习率调度器 WarmupCosineAnnealingLR/ReduceLROnPlateau/MultiStepLR
@@ -66,7 +66,7 @@ milestones: [30, 60]  # 学习率衰减里程碑
 # ==========================Augmentation===================
 Rotate:
   Rotate_img: true
-  Rotate_cam: false
-  img_angle: 50
-  cam_angle: 30
-  p: 0.8             # p为图片旋转的概率，(1-p)为相机旋转的概率
+  Rotate_cam: true
+  img_angle: 45
+  cam_angle: 0
+  p: 0.5             # p为图片旋转的概率，(1-p)为相机旋转的概率
