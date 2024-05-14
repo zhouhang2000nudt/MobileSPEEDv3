@@ -68,13 +68,12 @@ def prepare_Speed(config: dict):
                 A.OneOf([
                     A.AdvancedBlur(blur_limit=(3, 5),
                                    rotate_limit=25,
-                                   p=0.1),
-                    A.Blur(blur_limit=(3, 5), p=0.1),
+                                   p=0.2),
+                    A.Blur(blur_limit=(3, 5), p=0.2),
                     A.GaussNoise(var_limit=(5, 15),
-                                 p=0.1),
+                                 p=0.2),
                     A.GaussianBlur(blur_limit=(3, 5),
-                                   sigma_limit=1.5,
-                                   p=0.1),
+                                   p=0.2),
                     ], p=0.1),
                 A.ImageCompression(
                     quality_lower=95,
@@ -85,7 +84,7 @@ def prepare_Speed(config: dict):
                               contrast=0.2,
                               saturation=0.2,
                               hue=0.2,
-                              p=0.1),
+                              p=0.2),
                 # A.Affine(translate_percent={"x": (-0.2, 0.2), "y": (-0.2, 0.2)},
                 #          p=0.2),
                 # A.Compose([

@@ -19,7 +19,7 @@ class LightningMobileSPEEDv3(L.LightningModule):
         # 配置
         self.config: dict = config
         # 模型
-        self.model: Mobile_SPEEDv3 = Mobile_SPEEDv3(3, 4)
+        self.model: Mobile_SPEEDv3 = Mobile_SPEEDv3(self.config)
         # 损失函数
         self.pos_loss: PoseLoss = PoseLoss(self.config["pos_loss"])
         self.ori_loss: OriValLoss = OriValLoss(self.config["ori_loss"])

@@ -24,14 +24,22 @@ imgsz: [480, 768]     # 图片大小 [h, w]
 
 
 # ==========================model==========================
-neck: FPNPAN          # FPNPAN/BiFPN/AFPN
+pos_dim: 3                             # 位置维度
+ori_dim: 4                             # 姿态维度
+cls_dim: 16                           # 分类维度
+backbone: "mobilenetv3_large_100"          # 模型名
+pretrained: False
+neck: FPNPAN                            # FPNPAN/BiFPN/AFPN
+out_channels: 120                       # neck输出通道数
+RepECPHead_expand_ratio: [0.5, 0.75, 1]                 # 扩张率
+RepECPHead_pool_size: [3, 2, 1]         # 池化大小
 
 # ==========================loss===========================
 ALPHA: [1, 2]                       # Score = ALPHA[0] * POS_Error + ALPHA[1] * ORI_Error
 BETA: [1.2, 8, 10]                  # Loss = BETA[0] * POS_LOSS + BETA[1] * ORI_LOSS + BETA[2] * CLS_LOSS
 pos_loss: MSE                       # 位置损失函数 MAE/MSE/Huber/Log_Cosh (regression loss)
 ori_loss: CrossEntropy              # 姿态值损失函数 CrossEntropy/Focal
-cls_loss: Focal                     # 分类损失函数 CrossEntropy/Focal
+cls_loss: CrossEntropy              # 分类损失函数 CrossEntropy/Focal
 
 # ==========================train==========================
 optimizer: AdamW       # 优化器 Adam/SGD/AdamW
@@ -60,6 +68,6 @@ milestones: [30, 60]  # 学习率衰减里程碑
 Rotate:
   Rotate_img: true
   Rotate_cam: false
-  img_angle: 90
+  img_angle: 50
   cam_angle: 30
   p: 0.8             # p为图片旋转的概率，(1-p)为相机旋转的概率
