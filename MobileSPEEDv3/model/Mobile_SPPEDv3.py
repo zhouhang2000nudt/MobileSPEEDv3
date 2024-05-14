@@ -19,19 +19,24 @@ class Mobile_SPEEDv3(nn.Module):
         self.features = timm.create_model(config["backbone"], pretrained=config["pretrained"], features_only=True, out_indices=(2, 3, 4))
         assert self.features.feature_info.reduction() == [8, 16, 32], "Feature reduction must be [8, 16, 32]"
         
+        if self.features.feature_info.channels()[-1] > 4*self.features.feature_info.channels()[-2]:
+            SPPF_out_channels = self.features.feature_info.channels()[-1] // 2
+        else:
+            SPPF_out_channels = self.features.feature_info.channels()[-1]
+        
         self.SPPF = SPPF(in_channels=self.features.feature_info.channels()[-1],
-                         out_channels=self.features.feature_info.channels()[-1])
+                         out_channels=SPPF_out_channels)
         
         neck_in_channels = self.features.feature_info.channels()
-        self.FPNPAN = FPNPAN(in_channels=neck_in_channels, outchannels=config["out_channels"])
+        neck_in_channels[-1] = SPPF_out_channels
+        self.FPNPAN = FPNPAN(in_channels=neck_in_channels, out_channels=config["out_channels"])
         
-        neck_out_channels = [config["out_channels"]] * 3
+        neck_out_channels = config["out_channels"]
         
         self.RepECPHead = RepECPHead(in_channels=neck_out_channels, 
                                      expand_ratio=config["RepECPHead_expand_ratio"],
-                                     pool_size=config["RepECPHead_pool_size"],
                                      pos_dim=config["pos_dim"],
-                                     ori_dim=config["cls_dim"],
+                                     ori_dim=config["ori_dim"],
                                      cls_dim=config["cls_dim"])
         
     def forward(self, x: Tensor):

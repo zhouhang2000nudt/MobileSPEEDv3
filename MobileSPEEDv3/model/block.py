@@ -46,44 +46,46 @@ class SPPF(nn.Module):
 
 
 class FPNPAN(nn.Module):
-    def __init__(self, in_channels: List[int], outchannels: int = 80, fuse_mode: str = "cat"):
+    def __init__(self, in_channels: List[int], out_channels: List[int], fuse_mode: str = "cat"):
         super(FPNPAN, self).__init__()
         self.UpSample = nn.Upsample(scale_factor=2, mode="bilinear", align_corners=True)
         self.fuse_mode = fuse_mode
         
         # 通道对齐
-        self.conv_p3_align = ConvBnAct(in_channels=in_channels[0], out_channels=outchannels, kernel_size=3, stride=1)
-        self.conv_p4_align = ConvBnAct(in_channels=in_channels[1], out_channels=outchannels, kernel_size=3, stride=1)
-        self.conv_p5_align = ConvBnAct(in_channels=in_channels[2], out_channels=outchannels, kernel_size=3, stride=1)
+        self.conv_p3_align = ConvBnAct(in_channels=in_channels[0], out_channels=out_channels[0], kernel_size=3, stride=1)
+        self.conv_p4_align = ConvBnAct(in_channels=in_channels[1], out_channels=out_channels[1], kernel_size=3, stride=1)
+        self.conv_p5_align = ConvBnAct(in_channels=in_channels[2], out_channels=out_channels[2], kernel_size=3, stride=1)
         
         if fuse_mode == "cat":
-            fused_channel = outchannels * 2
+            fused_channel_p45 = out_channels[1] + out_channels[2]
+            fused_channel_p34 = out_channels[0] + out_channels[1]
         elif fuse_mode == "add":
-            fused_channel = outchannels
+            raise NotImplementedError("Not implemented yet")
+            pass
         
         # 上采样通路
-        self.p4_fuseconv_up = InvertedResidual(fused_channel, outchannels, exp_ratio=8)
-        self.p3_fuseconv_up = InvertedResidual(fused_channel, outchannels, exp_ratio=8)
+        self.p4_fuseconv_up = InvertedResidual(fused_channel_p45, out_channels[1], exp_ratio=8)
+        self.p3_fuseconv_up = InvertedResidual(fused_channel_p34, out_channels[0], exp_ratio=8)
         
         # 下采样通路
         self.p3_downconv_down = RepVGGplusBlock(
-            in_channels=outchannels,
-            out_channels=outchannels,
+            in_channels=out_channels[0],
+            out_channels=out_channels[0],
             kernel_size=3,
             stride=2,
             padding=1
         )
         
-        self.p4_fuseconv_down = InvertedResidual(fused_channel, outchannels, exp_ratio=8)
+        self.p4_fuseconv_down = InvertedResidual(fused_channel_p34, out_channels[1], exp_ratio=8)
         self.p4_downconv_down = RepVGGplusBlock(
-            in_channels=outchannels,
-            out_channels=outchannels,
+            in_channels=out_channels[1],
+            out_channels=out_channels[1],
             kernel_size=3,
             stride=2,
             padding=1
         )
         
-        self.p5_fuseconv_down = InvertedResidual(fused_channel, outchannels, exp_ratio=8)
+        self.p5_fuseconv_down = InvertedResidual(fused_channel_p45, out_channels[2], exp_ratio=8)
     
     def forward(self, x):
         p3, p4, p5 = x      # in: c_p3: 40, 60, 96; p4: c_p4, 30, 48; p5: c_p5, 15, 24
@@ -115,45 +117,36 @@ class FPNPAN(nn.Module):
 
 # ==================== head ====================
 
-class ECP(nn.Module):
-    def __init__(self, in_channels: List[int], expand_ratio: Union[int, List[float]], pool_size: List[int]):
-        super(ECP, self).__init__()
-        self.ECP_p3 = nn.Sequential(
-            RepVGGplusBlock(
-                in_channels=in_channels[0],
-                out_channels=int(in_channels[0] * expand_ratio[0]),
-                kernel_size=3,
-                stride=1,
-                padding=1
-            ),
-            nn.AdaptiveAvgPool2d((pool_size[0], pool_size[0])),
+class REP(nn.Module):
+    def __init__(self, in_channels: List[int], expand_ratio: Union[int, List[float]]):
+        super(REP, self).__init__()
+        self.REP_p3 = RepVGGplusBlock(
+            in_channels=in_channels[0],
+            out_channels=int(in_channels[0] * expand_ratio[0]),
+            kernel_size=3,
+            stride=1,
+            padding=1
         )
-        self.ECP_p4 = nn.Sequential(
-            RepVGGplusBlock(
-                in_channels=in_channels[1],
-                out_channels=int(in_channels[1] * expand_ratio[1]),
-                kernel_size=3,
-                stride=1,
-                padding=1
-            ),
-            nn.AdaptiveAvgPool2d((pool_size[1], pool_size[1])),
+        self.REP_p4 = RepVGGplusBlock(
+            in_channels=in_channels[1],
+            out_channels=int(in_channels[1] * expand_ratio[1]),
+            kernel_size=3,
+            stride=1,
+            padding=1
         )
-        self.ECP_p5 = nn.Sequential(
-            RepVGGplusBlock(
-                in_channels=in_channels[2],
-                out_channels=int(in_channels[2] * expand_ratio[2]),
-                kernel_size=3,
-                stride=1,
-                padding=1
-            ),
-            nn.AdaptiveAvgPool2d((pool_size[2], pool_size[2])),
+        self.REP_p5 = RepVGGplusBlock(
+            in_channels=in_channels[2],
+            out_channels=int(in_channels[2] * expand_ratio[2]),
+            kernel_size=3,
+            stride=1,
+            padding=1
         )
     
     def forward(self, x):
         p3, p4, p5 = x
-        p3 = self.ECP_p3(p3)
-        p4 = self.ECP_p4(p4)
-        p5 = self.ECP_p5(p5)
+        p3 = self.REP_p3(p3)
+        p4 = self.REP_p4(p4)
+        p5 = self.REP_p5(p5)
         return p3, p4, p5
 
 
@@ -163,44 +156,83 @@ class RSC(nn.Module):
     
     def forward(self, x):
         p3, p4, p5 = x
-        return torch.cat([p3.reshape(p3.size(0), -1), p4.reshape(p4.size(0), -1), p5.reshape(p5.size(0), -1)], dim=1)
+        bs = p3.size(0)
+        p3_h, p3_w = p3.size(2) // 4, p3.size(3) // 4
+        p4_h, p4_w = p4.size(2) // 2, p4.size(3) // 2
+        p5_h, p5_w = p5.size(2), p5.size(3)
+        return torch.cat([p3.reshape(bs, -1, p3_h, p3_w), p4.reshape(bs, -1, p4_h, p4_w), p5.reshape(bs, -1, p5_h, p5_w)], dim=1)
 
 
-class Head(nn.Module):
-    def __init__(self, in_features: int, pos_dim: int, ori_dim: int, num_classes: int = 16):
-        super(Head, self).__init__()
-        self.pos_fc = nn.Sequential(
-            nn.Linear(in_features, in_features // 8),
-            nn.ReLU(inplace=True),
-            nn.Linear(in_features // 8, pos_dim)
+class RepFConvHead(nn.Module):
+    def __init__(self, in_channels: int, pos_dim: int, ori_dim: int, cls_dim: int = 16):
+        super(RepFConvHead, self).__init__()
+        self.pos_fconv = nn.Sequential(
+            RepVGGplusBlock(
+                in_channels=in_channels,
+                out_channels=in_channels // 8,
+                kernel_size=3,
+                stride=1,
+                padding=1
+            ),
+            RepVGGplusBlock(
+                in_channels=in_channels // 8,
+                out_channels=pos_dim,
+                kernel_size=3,
+                stride=1,
+                padding=1
+            ),
+            nn.AdaptiveAvgPool2d((1, 1))
         )
-        self.ori_fc = nn.Sequential(
-            nn.Linear(in_features, in_features // 4),
-            nn.ReLU(inplace=True),
-            nn.Linear(in_features // 4, ori_dim),
-            nn.Softmax(dim=1)
+        self.ori_fconv = nn.Sequential(
+            RepVGGplusBlock(
+                in_channels=in_channels,
+                out_channels=in_channels // 8,
+                kernel_size=3,
+                stride=1,
+                padding=1
+            ),
+            RepVGGplusBlock(
+                in_channels=in_channels // 8,
+                out_channels=ori_dim,
+                kernel_size=3,
+                stride=1,
+                padding=1
+            ),
+            nn.AdaptiveAvgPool2d((1, 1))
         )
-        self.cls_fc = nn.Sequential(
-            nn.Linear(in_features, in_features // 2),
-            nn.ReLU(inplace=True),
-            nn.Linear(in_features // 2, num_classes),
-            nn.Softmax(dim=1)
+        self.cls_fconv = nn.Sequential(
+            RepVGGplusBlock(
+                in_channels=in_channels,
+                out_channels=in_channels // 8,
+                kernel_size=3,
+                stride=1,
+                padding=1
+            ),
+            RepVGGplusBlock(
+                in_channels=in_channels // 8,
+                out_channels=cls_dim,
+                kernel_size=3,
+                stride=1,
+                padding=1
+            ),
+            nn.AdaptiveAvgPool2d((1, 1))
         )
     
     def forward(self, x):
-        pos = self.pos_fc(x)
-        ori = self.ori_fc(x)
-        cls = self.cls_fc(x)
+        pos = self.pos_fconv(x).squeeze(-1).squeeze(-1)
+        ori = F.softmax(self.ori_fconv(x).squeeze(-1).squeeze(-1), dim=-1)
+        cls = F.softmax(self.cls_fconv(x).squeeze(-1).squeeze(-1), dim=-1)
         return pos, ori, cls
 
 class RepECPHead(nn.Sequential):
-    def __init__(self, in_channels: List[int], expand_ratio: Union[int, List[float]], pool_size: List[int], pos_dim: int, ori_dim: int, cls_dim: int = 16):
+    def __init__(self, in_channels: List[int], expand_ratio: Union[int, List[float]], pos_dim: int, ori_dim: int, cls_dim: int = 16):
         if isinstance(expand_ratio, int):
             expand_ratio = [expand_ratio] * 3
+        RSC_num = int(in_channels[0] * expand_ratio[0]) * 16 + int(in_channels[1] * expand_ratio[1]) * 4 + int(in_channels[2] * expand_ratio[2])
         super(RepECPHead, self).__init__(
-            ECP(in_channels, expand_ratio, pool_size),
+            REP(in_channels, expand_ratio),
             RSC(),
-            Head(sum([int(in_channels[i] * expand_ratio[i]) * pool_size[i]**2 for i in range(3)]), pos_dim, ori_dim, cls_dim),
+            RepFConvHead(RSC_num, pos_dim, ori_dim, cls_dim),
         )
 
 

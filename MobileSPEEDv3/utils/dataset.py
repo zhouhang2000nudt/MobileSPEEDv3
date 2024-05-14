@@ -213,6 +213,8 @@ class Speed(Dataset):
                     image, pos, ori = rotate_cam(image, pos, ori, Speed.camera.K, Speed.config["Rotate"]["cam_angle"])
             
             cls = torch.tensor(self.encode_dict[tuple((ori >= 0).tolist())])
+            if Speed.config["cls_dim"] > 16:
+                cls = torch.cat((cls, torch.zeros(Speed.config["cls_dim"] - 16)))
             ori = ori ** 2
             
             y: dict = {

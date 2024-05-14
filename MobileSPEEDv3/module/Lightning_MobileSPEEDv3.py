@@ -59,10 +59,10 @@ class LightningMobileSPEEDv3(L.LightningModule):
     def training_step(self, batch, batch_idx):
         inputs, labels = batch
         num = inputs.shape[0]
-        inputs = inputs.to(self.model.features[0][0].weight.dtype)
+        # inputs = inputs.to(self.model.features[0][0].weight.dtype)
         pos, ori, cls = self(inputs)
-        ori = ori.clone()
         pos = pos.clone()
+        ori = ori.clone()
         cls = cls.clone()
         train_pos_loss = self.pos_loss(pos, labels["pos"])
         train_ori_loss = self.ori_loss(ori, labels["ori"])
@@ -102,8 +102,8 @@ class LightningMobileSPEEDv3(L.LightningModule):
         inputs = inputs.to(self.model.features[0][0].weight.dtype)
         # 前向传播
         pos, ori, cls = self(inputs)
-        ori = ori.clone()
         pos = pos.clone()
+        ori = ori.clone()
         cls = cls.clone()
         # 计算损失
         val_pos_loss = self.pos_loss(pos, labels["pos"])
@@ -162,7 +162,7 @@ class LightningMobileSPEEDv3(L.LightningModule):
         self.logger.experiment.log_asset(self.trainer.callbacks[3].last_model_path, overwrite=True)
 
     def decode_ori(self, ori, cls, decode_dict):
-        cls = torch.argmax(cls, -1)
+        cls = torch.argmax(cls[:, :16], -1)
         cls = torch.tensor(list(map(lambda x: list(decode_dict[x]), cls.tolist())), device=cls.device)
         cls = torch.where(cls, 1, -1)
         ori_decoded = torch.sqrt(ori) * cls
@@ -182,7 +182,7 @@ class LightningMobileSPEEDv3(L.LightningModule):
             optimizer = SGD(self.parameters(), lr=self.config["lr0"],
                             weight_decay=self.config["weight_decay"],
                             momentum=self.config["momentum"])
-            
+        
         # 定义学习率调度器
         lr_scheduler_config: dict = {
             "scheduler": None,
