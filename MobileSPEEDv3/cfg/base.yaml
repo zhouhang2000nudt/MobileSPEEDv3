@@ -17,7 +17,7 @@ val: true
 
 
 # =========================dataset=========================
-data_dir: ../datasetsv3/speed     # 数据路径
+data_dir: ../datasets/speed     # 数据路径
 workers: 16            # dataloader workers
 ram: false            # 是否使用内存加载数据
 imgsz: [480, 768]     # 图片大小 [h, w]
@@ -27,11 +27,11 @@ imgsz: [480, 768]     # 图片大小 [h, w]
 pos_dim: 3                             # 位置维度
 ori_dim: 4                             # 姿态维度
 cls_dim: 16                           # 分类维度
-backbone: "mobilenetv3_large_100"          # 模型名
 pretrained: true
 neck: FPNPAN                            # FPNPAN/BiFPN/AFPN
 out_channels: [40, 60, 80]                       # neck输出通道数
-RepECPHead_expand_ratio: [1.2, 1, 0.8]                 # 扩张率
+expand_ratio: [1.2, 1, 0.8]                 # 扩张率
+pool_size: [3, 2, 1]                # 池化尺寸
 
 # ==========================loss===========================
 ALPHA: [1, 2]                       # Score = ALPHA[0] * POS_Error + ALPHA[1] * ORI_Error
@@ -68,5 +68,5 @@ Rotate:
   Rotate_img: true
   Rotate_cam: true
   img_angle: 50
-  cam_angle: 0
+  cam_angle: 10
   p: 0.5             # p为图片旋转的概率，(1-p)为相机旋转的概率

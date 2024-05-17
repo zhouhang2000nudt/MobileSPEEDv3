@@ -26,8 +26,8 @@ import matplotlib.pyplot as plt
 class Camera:
     fwx = 0.0176  # focal length[m]
     fwy = 0.0176  # focal length[m]
-    width = int(1920//2.5)  # number of horizontal[pixels]
-    height = int(1200//2.5)  # number of vertical[pixels]
+    width = 1920  # number of horizontal[pixels]
+    height = 1200  # number of vertical[pixels]
     ppx = 5.86e-6  # horizontal pixel pitch[m / pixel]
     ppy = ppx  # vertical pixel pitch[m / pixel]
     fx = fwx / ppx  # horizontal focal length[pixels]
@@ -105,7 +105,7 @@ def rotate_image(image, t, q, K, magnitude):
 
     return image_warped, t_new, q_new, M
 
-def warp_boxes(boxes, M, width, height):
+def wrap_boxes(boxes, M, width, height):
     n = len(boxes)
     if n:
         # warp points
@@ -151,9 +151,9 @@ def warp_boxes(boxes, M, width, height):
 
 
 def bbox_in_image(bbox_wrapped, bbox_area):
-    # 若bbox_wrapped的面积小于原来bbox面积的0.5，就认为bbox_wrapped不在图像内
+    # 若bbox_wrapped的面积小于原来bbox面积的0.95，就认为bbox_wrapped不在图像内
     bbox_wrapped_area = (bbox_wrapped[2] - bbox_wrapped[0]) * (bbox_wrapped[3] - bbox_wrapped[1])
-    return bbox_wrapped_area > 0.7 * bbox_area
+    return bbox_wrapped_area >= 0.95 * bbox_area
 
 
 def clamp(bbox):

@@ -49,7 +49,8 @@ if __name__ == "__main__":
                                  monitor="val/score",
                                  verbose=True,
                                  save_last=True,
-                                 mode="min")
+                                 mode="min",
+                                 save_weights_only=True)
     # 监控设备状态
     device_monitor = DeviceStatsMonitor(cpu_stats=None)
     # 模型总结

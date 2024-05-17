@@ -21,7 +21,8 @@ def profile_model(model):
 
 print(timm.list_models("*mobilenet*"))
 
-timm_model = timm.create_model("mobilenetv3_large_100", pretrained=False, features_only=True, out_indices=(2, 3, 4))
+timm_model = timm.create_model("mobilenetv3_large_100", pretrained=False, features_only=True)
+del timm_model.blocks[-1]
 print(timm_model.default_cfg)
 profile_model(timm_model)
 print(timm_model)
@@ -32,4 +33,6 @@ print("=====================================")
 
 config = get_config()
 full_model = Mobile_SPEEDv3(config)
+full_model.eval()
+full_model.switch_repvggplus_to_deploy()
 profile_model(full_model)

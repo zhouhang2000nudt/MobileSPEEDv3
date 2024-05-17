@@ -4,7 +4,7 @@ from pathlib import Path
 from threading import Thread
 from tqdm import tqdm
 from numpy import ndarray
-from .utils import rotate_image, rotate_cam, Camera, warp_boxes, bbox_in_image
+from .utils import rotate_image, rotate_cam, Camera, wrap_boxes, bbox_in_image
 from PIL import Image
 
 import albumentations as A
@@ -52,10 +52,10 @@ def prepare_Speed(config: dict):
     # 为Speed类添加属性
     Speed.config = config
     Speed.data_dir = Path(config["data_dir"])
-    Speed.image_dir = Speed.data_dir / "images"
-    Speed.label_file = Speed.data_dir / "labels.json"
-    Speed.test_img_dir = Speed.data_dir / "test"
-    Speed.real_test_img_dir = Speed.data_dir / "real_test"
+    Speed.image_dir = Speed.data_dir / "images/train"
+    Speed.label_file = Speed.data_dir / "train_label.json"
+    Speed.test_img_dir = Speed.data_dir / "images/train"
+    Speed.real_test_img_dir = Speed.data_dir / "images/train"
 
     # 设置transform
     Speed.transform = {
@@ -63,6 +63,7 @@ def prepare_Speed(config: dict):
         "train": {
             "transform": v2.Compose([
                 v2.ToTensor(),
+                v2.Resize(size=config["imgsz"]),
             ]),
             "A_transform": A.Compose([
                 A.OneOf([
@@ -74,12 +75,12 @@ def prepare_Speed(config: dict):
                                  p=0.2),
                     A.GaussianBlur(blur_limit=(3, 5),
                                    p=0.2),
-                    ], p=0.1),
-                A.ImageCompression(
-                    quality_lower=95,
-                    quality_upper=100,
-                    p=0.1
-                ),
+                    ], p=0.2),
+                # A.ImageCompression(
+                #     quality_lower=95,
+                #     quality_upper=100,
+                #     p=0.2
+                # ),
                 A.ColorJitter(brightness=0.2,
                               contrast=0.2,
                               saturation=0.2,
@@ -99,12 +100,14 @@ def prepare_Speed(config: dict):
         "val": {
             "transform": v2.Compose([
                 v2.ToTensor(),
+                v2.Resize(size=config["imgsz"]),
             ]),
             "A_transform": None,
         },
         "test": {
             "transform": v2.Compose([
                 v2.ToTensor(),
+                v2.Resize(size=config["imgsz"]),
             ]),
             "A_transform": None,
         }
@@ -150,9 +153,7 @@ class ImageReader(Thread):
     
     def run(self):
         for img_name in tqdm(self.image_name):
-            img = cv.imread(str(self.image_dir / img_name.replace(".jpg", ".png")), cv.IMREAD_GRAYSCALE)
-            # img = cv.cvtColor(img, cv.COLOR_BGR2RGB)
-            # img = cv.resize(img, (self.config["imgsz"][1], self.config["imgsz"][0]))
+            img = cv.imread(str(self.image_dir / img_name), cv.IMREAD_GRAYSCALE)
             self.img_dict[img_name] = img
     
     def get_result(self) -> dict:
@@ -193,34 +194,55 @@ class Speed(Dataset):
         if Speed.config["ram"]:
             image = Speed.img_dict[filename]                         # 伪图片
         else:
-            image = cv.imread(str(self.image_dir / filename.replace(".jpg", ".png")), cv.IMREAD_GRAYSCALE)   # 读取图片
+            image = cv.imread(str(self.image_dir / filename), cv.IMREAD_GRAYSCALE)       # 读取图片
         
         if self.mode != "test":
             ori = torch.tensor(self.labels[filename]["ori"])   # 姿态  (,4)
             pos = torch.tensor(self.labels[filename]["pos"])   # 位置  (,3)
             
             bbox = self.labels[filename]["bbox"]
+            
+            # 先进行wrapping
+            dice = np.random.rand()
+            if self.mode == "train" and (Speed.config["Rotate"]["Rotate_img"] or Speed.config["Rotate"]["Rotate_cam"]):
+                wrapped_time = 0
+                bbox_area = (bbox[2] - bbox[0]) * (bbox[3] - bbox[1])
+                wrapped = False
+                if Speed.config["Rotate"]["Rotate_img"] and dice <= Speed.config["Rotate"]["p"]:
+                    while True:
+                        if wrapped_time > 10:
+                            wrapped = False
+                            break
+                        wrapped_time += 1
+                        image_wrapped, pos_wrapped, ori_wrapped, M_wrapped = rotate_image(image, pos, ori, Speed.camera.K, Speed.config["Rotate"]["img_angle"])
+                        bbox_wrapped = wrap_boxes(np.array([bbox]), M_wrapped, height=1200, width=1920).tolist()[0]
+                        if bbox_in_image(bbox_wrapped, bbox_area):
+                            wrapped = True
+                            break
+                elif Speed.config["Rotate"]["Rotate_cam"] and dice > Speed.config["Rotate"]["p"]:
+                    while True:
+                        if wrapped_time > 10:
+                            wrapped = False
+                            break
+                        wrapped_time += 1
+                        image_wrapped, pos_wrapped, ori_wrapped, M_wrapped = rotate_cam(image, pos, ori, Speed.camera.K, Speed.config["Rotate"]["cam_angle"])
+                        bbox_wrapped = wrap_boxes(np.array([bbox]), M_wrapped, height=1200, width=1920).tolist()[0]
+                        if bbox_in_image(bbox_wrapped, bbox_area):
+                            wrapped = True
+                            break
+                        
+                if wrapped:
+                    image = image_wrapped
+                    pos = pos_wrapped
+                    ori = ori_wrapped
+                    bbox = bbox_wrapped   
+            
             # 进行Albumentation增强
             if self.A_transform is not None:
                 transformed = self.A_transform(image=image, bboxes=[bbox], category_ids=[1])
                 image = transformed["image"]
                 bbox = list(transformed["bboxes"][0])
-        
-            dice = np.random.rand(1)
-            if self.mode == "train" and (Speed.config["Rotate"]["Rotate_img"] or Speed.config["Rotate"]["Rotate_cam"]):
-                wrapped_time = 0
-                bbox_area = (bbox[2] - bbox[0]) * (bbox[3] - bbox[1])
-                while wrapped_time == 0 or not bbox_in_image(bbox_wrapped, bbox_area):
-                    wrapped_time += 1
-                    if Speed.config["Rotate"]["Rotate_img"] and dice <= Speed.config["Rotate"]["p"]:
-                        image, pos, ori, M = rotate_image(image, pos, ori, Speed.camera.K, Speed.config["Rotate"]["img_angle"])                  # bbox (1, 4)
-                    elif Speed.config["Rotate"]["Rotate_cam"] and dice > Speed.config["Rotate"]["p"]:
-                        image, pos, ori, M = rotate_cam(image, pos, ori, Speed.camera.K, Speed.config["Rotate"]["cam_angle"])
-                    bbox_wrapped = warp_boxes(np.array([bbox]), M, height=Speed.config["imgsz"][0], width=Speed.config["imgsz"][1]).tolist()[0]
-                    if wrapped_time > 10:
-                        break
-                if bbox_in_image(bbox_wrapped, bbox_area):
-                    bbox = bbox_wrapped
+                
             
             cls = torch.tensor(self.encode_dict[tuple((ori >= 0).tolist())])
             if Speed.config["cls_dim"] > 16:
@@ -232,15 +254,12 @@ class Speed(Dataset):
                 "pos": pos,
                 "ori": ori,
                 "cls": cls,
+                "bbox": bbox
             }
         else:
             y: dict = {
                 "filename": filename,
             }
-
-        # resize
-        image = Image.fromarray(image)
-        image = image.resize((Speed.config["imgsz"][1], Speed.config["imgsz"][0]))
         
         # 使用torchvision转换图片
         image = self.transform(image)       # (1, 480, 768)
