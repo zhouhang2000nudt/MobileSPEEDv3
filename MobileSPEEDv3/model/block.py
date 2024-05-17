@@ -222,43 +222,40 @@ class RSC(nn.Module):
 
 
 class Head(nn.Module):
-    def __init__(self, in_features: int, pos_dim: int, ori_dim: int, cls_dim: int = 16):
+    def __init__(self, in_features: int, pos_dim: int, ori_dim: int):
         super(Head, self).__init__()
-        features_ = in_features // 2
+        features_ = in_features
         self.pos_dim = pos_dim
         self.ori_dim = ori_dim
-        self.cls_dim = cls_dim
         self.fc = nn.Sequential(
             nn.Linear(in_features, features_),
             nn.LeakyReLU(negative_slope=0.1, inplace=True),
         )
         self.pos_fc = nn.Sequential(
-            nn.Linear(features_ // 2, features_ // 4),
-            nn.Linear(features_ // 4, pos_dim)
+            nn.Linear(features_ // 2, pos_dim),
+            # nn.Linear(features_ // 4, pos_dim)
         )
-        self.ori_cls_fc = nn.Sequential(
-            nn.Linear(features_ // 2, features_ // 4),
-            nn.Linear(features_ // 4, ori_dim + cls_dim),
+        self.ori_fc = nn.Sequential(
+            nn.Linear(features_ // 2, ori_dim),
+            # nn.Linear(features_ // 2, ori_dim),
         )
     
     def forward(self, x):
         x = self.fc(x)
-        pos_feature, ori_cls_feature = torch.chunk(x, 2, dim=1)
+        pos_feature, ori_feature = torch.chunk(x, 2, dim=1)
         pos = self.pos_fc(pos_feature)
-        ori_cls = self.ori_cls_fc(ori_cls_feature)
-        ori, cls = torch.split(ori_cls, [self.ori_dim, self.cls_dim], dim=1)
+        ori = self.ori_fc(ori_feature)
         ori = torch.softmax(ori, dim=1)
-        cls = torch.softmax(cls, dim=1)
-        return pos, ori, cls
+        return pos, ori
 
 class RepECPHead(nn.Sequential):
-    def __init__(self, in_channels: List[int], expand_ratio: Union[int, List[float]], pool_size: List[int], pos_dim: int, ori_dim: int, cls_dim: int = 16):
+    def __init__(self, in_channels: List[int], expand_ratio: Union[int, List[float]], pool_size: List[int], pos_dim: int, ori_dim: int):
         if isinstance(expand_ratio, int):
             expand_ratio = [expand_ratio] * 3
         super(RepECPHead, self).__init__(
             ECP(in_channels, expand_ratio, pool_size),
             RSC(),
-            Head(sum([int(in_channels[i] * expand_ratio[i] * pool_size[i]**2) for i in range(3)]), pos_dim, ori_dim, cls_dim),
+            Head(sum([int(in_channels[i] * expand_ratio[i] * pool_size[i]**2) for i in range(3)]), pos_dim, ori_dim),
         )
 
 

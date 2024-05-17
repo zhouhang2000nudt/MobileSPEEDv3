@@ -4,7 +4,7 @@ from pathlib import Path
 from threading import Thread
 from tqdm import tqdm
 from numpy import ndarray
-from .utils import rotate_image, rotate_cam, Camera, wrap_boxes, bbox_in_image
+from .utils import rotate_image, rotate_cam, Camera, wrap_boxes, bbox_in_image, encode_ori
 from PIL import Image
 
 import albumentations as A
@@ -195,14 +195,14 @@ def prepare_Speed(config: dict):
         Speed.fake_img = np.zeros((1200, 1980, 3), dtype=np.uint8)
     
     # 生成所有可能的布尔值组合
-    bool_values = [True, False]
-    combinations = list(itertools.product(bool_values, repeat=4))
-    # 将布尔值组合转换为独热编码
-    for i, combo in enumerate(combinations):
-        one_hot = [0] * 16
-        one_hot[i] = 1
-        Speed.encode_dict[combo] = one_hot
-        Speed.decode_dict[i] = combo
+    # bool_values = [True, False]
+    # combinations = list(itertools.product(bool_values, repeat=4))
+    # # 将布尔值组合转换为独热编码
+    # for i, combo in enumerate(combinations):
+    #     one_hot = [0] * 16
+    #     one_hot[i] = 1
+    #     Speed.encode_dict[combo] = one_hot
+    #     Speed.decode_dict[i] = combo
 
 
 class ImageReader(Thread):
@@ -320,16 +320,22 @@ class Speed(Dataset):
                 image_2 = image_2.repeat(3, 1, 1)
                 return image_1, image_2
             
-            cls = torch.tensor(self.encode_dict[tuple((ori >= 0).tolist())])
-            if Speed.config["cls_dim"] > 16:
-                cls = torch.cat((cls, torch.zeros(Speed.config["cls_dim"] - 16)))
-            ori = ori ** 2
+            # cls = torch.tensor(self.encode_dict[tuple((ori >= 0).tolist())])
+            # if Speed.config["cls_dim"] > 16:
+            #     cls = torch.cat((cls, torch.zeros(Speed.config["cls_dim"] - 16)))
+            # ori = ori ** 2
+            ori_encode = encode_ori(ori,
+                                    Speed.config["H_MAP"],
+                                    Speed.config["REDUNDANT_FLAGS"],
+                                    Speed.config["ORI_SMOOTH_FACTOR"],
+                                    Speed.config["N_ORI_BINS_PER_DIM"])
             
             y: dict = {
                 "filename": filename,
                 "pos": pos,
                 "ori": ori,
-                "cls": cls,
+                "ori_encode": ori_encode,
+                # "cls": cls,
                 "bbox": bbox
             }
         else:

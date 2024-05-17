@@ -10,7 +10,7 @@ from ..model.Mobile_SPPEDv3 import Mobile_SPEEDv3
 from ..utils.loss import PoseLoss, OriValLoss, OriFaceLoss
 from ..utils.metrics import Loss, PosError, OriError, Score
 from ..utils.dataset import Speed
-
+from ..utils.utils import decode_ori_batch
 
 
 class LightningMobileSPEEDv3(L.LightningModule):
@@ -23,17 +23,14 @@ class LightningMobileSPEEDv3(L.LightningModule):
         # 损失函数
         self.pos_loss: PoseLoss = PoseLoss(self.config["pos_loss"])
         self.ori_loss: OriValLoss = OriValLoss(self.config["ori_loss"])
-        self.cls_loss: OriFaceLoss = OriFaceLoss(self.config["cls_loss"])
         # 损失比例
         self.BETA = self.config["BETA"]
         # 指标
         self.train_ori_loss: Loss = Loss()
         self.train_pos_loss: Loss = Loss()
-        self.train_cls_loss: Loss = Loss()
         self.train_loss: Loss = Loss()
         self.val_ori_loss: Loss = Loss()
         self.val_pos_loss: Loss = Loss()
-        self.val_cls_loss: Loss = Loss()
         self.val_loss: Loss = Loss()
         self.ori_error: OriError = OriError()
         self.pos_error: PosError = PosError()
@@ -60,19 +57,16 @@ class LightningMobileSPEEDv3(L.LightningModule):
         inputs, labels = batch
         num = inputs.shape[0]
         # inputs = inputs.to(self.model.features[0][0].weight.dtype)
-        pos, ori, cls = self(inputs)
+        pos, ori = self(inputs)
         pos = pos.clone()
         ori = ori.clone()
-        cls = cls.clone()
         train_pos_loss = self.pos_loss(pos, labels["pos"])
-        train_ori_loss = self.ori_loss(ori, labels["ori"])
-        train_cls_loss = self.cls_loss(cls, labels["cls"])
+        train_ori_loss = self.ori_loss(ori, labels["ori_encode"])
 
-        train_loss = self.BETA[0] * train_pos_loss + self.BETA[1] * train_ori_loss + self.BETA[2] * train_cls_loss
+        train_loss = self.BETA[0] * train_pos_loss + self.BETA[1] * train_ori_loss
 
         self.train_pos_loss.update(train_pos_loss, num)
         self.train_ori_loss.update(train_ori_loss, num)
-        self.train_cls_loss.update(train_cls_loss, num)
         self.train_loss.update(train_loss, num)
         return train_loss
 
@@ -81,18 +75,16 @@ class LightningMobileSPEEDv3(L.LightningModule):
         self.log_dict({
             "train/pos_loss": self.train_pos_loss.compute(),
             "train/ori_loss": self.train_ori_loss.compute(),
-            "train/cls_loss": self.train_cls_loss.compute(),
             "train/loss": self.train_loss.compute(),
         }, on_epoch=True)
         self.train_pos_loss.reset()
         self.train_ori_loss.reset()
-        self.train_cls_loss.reset()
         self.train_loss.reset()
     
 
     # ===========================validation===========================
     def on_validation_start(self) -> None:
-        rich.print(f"[b]{'train':<5} Epoch {self.current_epoch:>3}/{self.trainer.max_epochs:<3} pos_loss: {self.train_pos_loss.compute().item():<8.4f}  ori_loss: {self.train_ori_loss.compute().item():<8.4f}  cls_loss: {self.train_cls_loss.compute().item():<8.4f}  loss: {self.train_loss.compute().item():<8.4f}")
+        rich.print(f"[b]{'train':<5} Epoch {self.current_epoch:>3}/{self.trainer.max_epochs:<3} pos_loss: {self.train_pos_loss.compute().item():<8.4f}  ori_loss: {self.train_ori_loss.compute().item():<8.4f}  loss: {self.train_loss.compute().item():<8.4f}")
 
     
     def validation_step(self, batch, batch_index):
@@ -100,23 +92,20 @@ class LightningMobileSPEEDv3(L.LightningModule):
         inputs, labels = batch
         num = inputs.shape[0]
         # 前向传播
-        pos, ori, cls = self(inputs)
+        pos, ori = self(inputs)
         pos = pos.clone()
         ori = ori.clone()
-        cls = cls.clone()
         # 计算损失
         val_pos_loss = self.pos_loss(pos, labels["pos"])
-        val_ori_loss = self.ori_loss(ori, labels["ori"])
-        val_cls_loss = self.cls_loss(cls, labels["cls"])
-        val_loss = self.BETA[0] * val_pos_loss + self.BETA[1] * val_ori_loss + self.BETA[2] * val_cls_loss
+        val_ori_loss = self.ori_loss(ori, labels["ori_encode"])
+        val_loss = self.BETA[0] * val_pos_loss + self.BETA[1] * val_ori_loss
         # 计算指标
         self.val_pos_loss.update(val_pos_loss, num)
         self.val_ori_loss.update(val_ori_loss, num)
-        self.val_cls_loss.update(val_cls_loss, num)
         self.val_loss.update(val_loss, num)
         
-        ori = self.decode_ori(ori, cls, Speed.decode_dict)
-        self.ori_error.update(ori, self.decode_ori(labels["ori"], labels["cls"], Speed.decode_dict))
+        ori_decode, _ = decode_ori_batch(ori, self.config["B"])
+        self.ori_error.update(ori_decode, labels["ori"])
         self.pos_error.update(pos, labels["pos"])
         if self.config["save_csv"]:
             new_result = [labels["filename"][0],
@@ -140,17 +129,15 @@ class LightningMobileSPEEDv3(L.LightningModule):
         self.metric_dict = {
             "val/pos_loss": self.val_pos_loss.compute(),
             "val/ori_loss": self.val_ori_loss.compute(),
-            "val/cls_loss": self.val_cls_loss.compute(),
             "val/loss": self.val_loss.compute(),
             "val/ori_error(deg)": self.ori_error.compute(),
             "val/pos_error(m)": self.pos_error.compute(),
             "val/score": self.score.compute(),
         }
         self.log_dict(self.metric_dict, on_epoch=True)
-        rich.print(f"[b]{'val':<5} Epoch {self.current_epoch:>3}/{self.trainer.max_epochs:<3} pos_loss: {self.val_pos_loss.compute().item():<8.4f}  ori_loss: {self.val_ori_loss.compute().item():<8.4f}  cls_loss: {self.val_cls_loss.compute().item():<8.4f}  loss: {self.val_loss.compute().item():<8.4f}  pos_error(m): {self.pos_error.compute().item():<8.4f}  ori_error(deg): {self.ori_error.compute().item():<8.4f}")
+        rich.print(f"[b]{'val':<5} Epoch {self.current_epoch:>3}/{self.trainer.max_epochs:<3} pos_loss: {self.val_pos_loss.compute().item():<8.4f}  ori_loss: {self.val_ori_loss.compute().item():<8.4f}  loss: {self.val_loss.compute().item():<8.4f}  pos_error(m): {self.pos_error.compute().item():<8.4f}  ori_error(deg): {self.ori_error.compute().item():<8.4f}")
         self.val_pos_loss.reset()
         self.val_ori_loss.reset()
-        self.val_cls_loss.reset()
         self.val_loss.reset()
         self.ori_error.reset()
         self.pos_error.reset()
@@ -159,13 +146,6 @@ class LightningMobileSPEEDv3(L.LightningModule):
     def on_fit_end(self):
         self.logger.experiment.log_asset(self.trainer.callbacks[3].best_model_path, overwrite=True)
         self.logger.experiment.log_asset(self.trainer.callbacks[3].last_model_path, overwrite=True)
-
-    def decode_ori(self, ori, cls, decode_dict):
-        cls = torch.argmax(cls[:, :16], -1)
-        cls = torch.tensor(list(map(lambda x: list(decode_dict[x]), cls.tolist())), device=cls.device)
-        cls = torch.where(cls, 1, -1)
-        ori_decoded = torch.sqrt(ori) * cls
-        return ori_decoded
     
     def configure_optimizers(self):
         # 定义优化器

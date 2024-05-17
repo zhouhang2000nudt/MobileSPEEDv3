@@ -338,78 +338,59 @@ def encode_as_keypoints(oris, centroids, scale=1.0):
 
     return K1, K2
 
-def encode_ori(oris, nr_bins_per_dim, beta, min_lim, max_lim):
-    '''Soft assignment of orientations to a quantized space
-    Take input vectors as Gaussian random variables and quantize these using softmax
-    Arguments:
-        - oris: An array [n,4] of quaternions to be encoded
-        - nr_bins_per_dim: Number of bins used for each axis/angle of the encoding structure. Assuming the same number of
-        bins for all axes actually leads to different resolution per Euler angle. 
-        - beta: hyperparameter used to scale the kernel width.
-        - min_lim, max_lim: Limits of Euler angles as two 3D arrays.
-    Returns:
-        - ori_encoded: Encoded orientations (oris)
-        - H_quat: Map of quaternions represented by the encoding bins
-        - Redundant_flags: Binary mask for bins that represent the same orientation.
-    '''
+def pre_compute_ori_decode(ori_histogram):
+    """Pre-compute Orientation decode to save time during training/inference """
+    n_bins = ori_histogram.size(0)
+    return torch.reshape(ori_histogram, (n_bins, 4, 1)) * torch.reshape(ori_histogram, (n_bins, 1, 4))
 
-    nr_examples = np.size(oris, 0)
+def build_histogram(n_bins_per_dim, min_lim, max_lim):
+    """Building the histogram of all possible orientation bins, given the number of bins per dimension and
+    min/max limits on Z, Y and X axis (rotation). See https://arxiv.org/pdf/1906.09868.pdf
+    The histogram is built only once to save time during execution
+    """
+
     d = 3
-    nr_total_bins = nr_bins_per_dim**d
-
-    # Use the variance of Gaussian approximation of a uniform distribution to scale distances
-    # For details check the Chapter 2 of my PhD thesis
-    delta = beta / nr_bins_per_dim
-    var = delta ** 2 / 12
-    print('Variance used for encoding: ', var)
+    n_bins = n_bins_per_dim ** d
 
     # Construct histogram structure
-    bins_loc_per_dim = np.linspace(0.0, 1.0, nr_bins_per_dim)
-    H_loc_list = list(itertools.product(bins_loc_per_dim, repeat=d))
-    H_ori = np.asarray(H_loc_list * (max_lim - min_lim) + min_lim)
-    H_quat = np.zeros(shape=(nr_total_bins, 4), dtype=np.float32)
-    for i in range(nr_total_bins):
-        H_quat[i, :] = se3lib.euler2quat(H_ori[i, 0], H_ori[i, 1], H_ori[i, 2]).T
+    bins_per_dim = torch.linspace(0.0, 1.0, n_bins_per_dim)
+    bins_all_dims = torch.cartesian_prod(bins_per_dim, bins_per_dim, bins_per_dim)
+    euler_bins = bins_all_dims * (max_lim - min_lim) + min_lim
+    quaternions_bins = torch.zeros((n_bins, 4), dtype=torch.float32)
 
-    # Find redundant bins
-    eps = np.cos(0.5*np.pi/180)
+    for i in range(n_bins):
+        quaternions_bins[i, :] = se3lib.euler2quat(euler_bins[i, 0], euler_bins[i, 1], euler_bins[i, 2])
 
-    print('Pruning redundant bins.')
-    # A) Brute force way (super slow)
-    # Boundary_flags = np.any(np.logical_or((H_ori == min_lim),(H_ori == max_lim)),1)
-    #
-    # for i in range(nr_total_bins):
-    #     if Boundary_flags[i]:
-    #         q1 = H_quat[i, :]
-    #         for j in range(i+1,nr_total_bins):
-    #             if Boundary_flags[j]:
-    #                 q2 = H_quat[j, :]
-    #                 if np.abs(np.sum(q1*q2, axis=-1)) > eps and not Redundant_flags[j]:
-    #                     Redundant_flags[j] = True
-    #
-    # B) Efficient way
+    # Pruning redundant bins
     # Mark redundant boundary bins
-    Boundary_flags = np.logical_or(H_ori[:,0] == max_lim[0], H_ori[:,2] == max_lim[2])
+    boundary_flags = torch.logical_or(euler_bins[:, 0] == max_lim[0], euler_bins[:, 2] == max_lim[2])
+
     # Mark redundant bins due to the two singularities at y = -+ 90 deg
-    Gymbal_flags = np.logical_and(np.abs(H_ori[:,1]) == max_lim[1], H_ori[:,0] != min_lim[0])
-    Redundant_flags = np.logical_or(Boundary_flags, Gymbal_flags)
+    gymbal_flags = torch.logical_and(np.abs(euler_bins[:, 1]) == max_lim[1], euler_bins[:, 0] != min_lim[0])
+    redundant_flags = torch.logical_or(boundary_flags, gymbal_flags)
 
-    print('Encoding.')
-    ori_encoded = np.zeros(shape=(nr_examples, nr_bins_per_dim ** d), dtype=np.float32)
+    return quaternions_bins, redundant_flags
 
-    # Sampling pdf for each
-    for i in range(nr_examples):
+def encode_ori(ori, ori_histogram, redundant_flags, smooth_factor, n_bins_per_dim):
+    """Encode orientation (true orientation from the dataset)
+    This code is optimized compared to Proença code: vectorization"""
 
-        #1. Compute Kernel function outputs based on scaled angular errors [0,1]
-        H_prbs = np.exp(-2 * (np.arccos(np.minimum(1.0,np.abs(np.sum(oris[i,:] * H_quat, axis=-1))))/np.pi) ** 2 / var)
+    variance = (smooth_factor / n_bins_per_dim) ** 2 / 12
 
-        for j in range(nr_total_bins):
-            if Redundant_flags[j]:
-                H_prbs[j] = 0
+    # Compute Kernel function (equation 3 in Proença article https://arxiv.org/pdf/1907.04298.pdf)
+    kernel_fct = torch.exp(- ((2 * torch.arccos(torch.minimum(torch.tensor(1.0), torch.abs(torch.sum(
+        ori * ori_histogram, dim=1)))) / np.pi) ** 2) / (2 * variance))
 
-        ori_encoded[i, :] = H_prbs / np.sum(H_prbs)
+    kernel_fct[redundant_flags] = 0
 
-    return ori_encoded, H_quat, Redundant_flags
+    ori_encoded = kernel_fct / torch.sum(kernel_fct)
+
+    if True in torch.isnan(ori_encoded):
+        print('ori encoded is nan in encode_ori function')
+
+    return ori_encoded
+
+
 
 def encode_ori_fast(oris, beta, H_quat, Redundant_flags):
     '''Soft assignment of orientations to a quantized space
@@ -439,6 +420,73 @@ def encode_ori_fast(oris, beta, H_quat, Redundant_flags):
             H_prbs[j] = 0
 
     return H_prbs / np.sum(H_prbs)
+
+def decode_ori(ori, b):
+    """Decode orientation predicted by the neural network.
+    This code is optimized compared to Proença code: vectorization and pre-compute
+
+    Compute the average quaternion q of a set of quaternions Q,
+    based on a Linear Least Squares Solution of the form: Ax = 0
+
+    The sum of squared dot products between quaternions:
+        L(q) = sum_i w_i(Q_i^T*q)^T(Q_i^T*q)^T
+
+    achieves its maximum when its derivative wrt q is zero, i.e.:
+        Aq = 0 where A = sum_i (Q_i*Q_i^T)
+
+    Therefore, the optimal q is simply the right null space of A.
+
+    For more solutions check:
+    F. Landis Markley et al. "Averaging quaternions." Journal of Guidance, Control, and Dynamics (2007)
+    https://ntrs.nasa.gov/api/citations/20070017872/downloads/20070017872.pdf
+
+    Arguments:
+        b: The pre-computed decode ori variable based on the histogram
+        ori: The weights associated to each orientation bin (prediction of the neural network)
+    Returns:
+        q_avg: The solution
+        h_inv: The uncertainty in the maximum likelihood sense
+    """
+
+    n_bins = b.size(0)
+
+    # Remark: referenced as small "a" in the code but big "A" in the article
+    a = torch.sum(b * torch.reshape(ori, (n_bins, 1, 1)), dim=0)
+
+    if True in torch.isnan(a):
+        raise ValueError("Error during orientation decoding")
+
+    # s, v = torch.eig(a, eigenvectors=True)
+    s, v = torch.linalg.eig(a)
+    s, v = torch.real(s), torch.real(v)
+
+    idx = torch.argsort(s)
+
+    q_avg = v[:, idx[-1]]
+
+    # Due to numerical errors, we need to enforce normalization (comes from Proença code)
+    q_avg = q_avg / torch.linalg.norm(q_avg)
+
+    h_inv = torch.inverse(a)
+
+    return q_avg, h_inv
+
+def decode_ori_batch(ori, b):
+    """Decode a batch of orientation (ori) using the pre-computed orientation decode variable (b) based on the histogram
+    (see pre_compute_ori_decode)
+    """
+
+    ori = ori.cpu()
+    batch_size = ori.size(0)
+
+    ori_avg = torch.zeros((batch_size, 4), dtype=torch.float16)
+    h_avg = torch.zeros((batch_size, 4, 4), dtype=torch.float16)
+
+    for i in range(batch_size):
+        ori_avg[i], h_avg[i] = decode_ori(ori[i], b)
+
+    return ori_avg.cuda(), h_avg.cuda()
+
 
 
 def encode_loc(locs, nr_bins_per_dim, beta, max_lim, min_lim):

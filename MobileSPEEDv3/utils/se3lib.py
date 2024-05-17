@@ -4,6 +4,7 @@ Copyright (c) 2019 Pedro F. Proenza
 
 import numpy as np
 import math as math
+import torch
 
 def euler2SO3_unreal(pitch, yaw, roll):
     """Convert euler angles in degrees to a rotation matrix using unreal engine order (valid)"""
@@ -51,18 +52,19 @@ def euler2SO3_left(pitch, yaw, roll):
     return R
 
 def euler2quat(pitch, yaw, roll):
-    """Convert euler angles in degrees to a quaternion"""
-    cos_pitch = np.cos(pitch*np.pi/360)
-    sin_pitch = np.sin(pitch*np.pi/360)
-    cos_yaw = np.cos(yaw*np.pi/360)
-    sin_yaw = np.sin(yaw*np.pi/360)
-    cos_roll = np.cos(roll*np.pi/360)
-    sin_roll = np.sin(roll*np.pi/360)
+    """Convert euler angles in degrees to a quaternion
+    Yaw (Z), Pitch(Y), Roll (X)"""
+    cy = torch.cos(yaw * np.pi / 360)
+    sy = torch.sin(yaw * np.pi / 360)
+    cp = torch.cos(pitch * np.pi / 360)
+    sp = torch.sin(pitch * np.pi / 360)
+    cr = torch.cos(roll * np.pi / 360)
+    sr = torch.sin(roll * np.pi / 360)
 
-    q = np.matrix([[sin_yaw*sin_roll*cos_pitch - cos_yaw*cos_roll*sin_pitch],
-                   [-sin_yaw*cos_roll*cos_pitch - cos_yaw*sin_roll*sin_pitch],
-                   [-cos_yaw*sin_roll*cos_pitch + sin_yaw*cos_roll*sin_pitch],
-                   [cos_yaw*cos_roll*cos_pitch + sin_yaw*sin_roll*sin_pitch]])
+    q = torch.tensor([cr * cp * cy + sr * sp * sy,
+                      sr * cp * cy - cr * sp * sy,
+                      cr * sp * cy + sr * cp * sy,
+                      cr * cp * sy - sr * sp * cy])
 
     return q
 
