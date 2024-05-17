@@ -14,7 +14,7 @@ from MobileSPEEDv3.utils.config import get_config
 
 
 def profile_model(model):
-    flops, params = get_model_complexity_info(model, (3, 480, 768), as_strings=True, print_per_layer_stat=False, verbose=False, flops_units="GMac", param_units="M", output_precision=10)
+    flops, params = get_model_complexity_info(model, (3, 240, 384), as_strings=True, print_per_layer_stat=False, verbose=False, flops_units="GMac", param_units="M", output_precision=10)
     print(flops)
     print(params)
 
