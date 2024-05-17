@@ -14,6 +14,7 @@ offline: false          # 是否离线训练
 save_csv: false
 train: true
 val: true
+self_supervised: false
 
 
 # =========================dataset=========================
@@ -28,6 +29,7 @@ pos_dim: 3                             # 位置维度
 ori_dim: 4                             # 姿态维度
 cls_dim: 16                           # 分类维度
 pretrained: true
+deform_layers: [9, 11, 14]
 neck: FPNPAN                            # FPNPAN/BiFPN/AFPN
 out_channels: [40, 60, 80]                       # neck输出通道数
 expand_ratio: [1.2, 1, 0.8]                 # 扩张率

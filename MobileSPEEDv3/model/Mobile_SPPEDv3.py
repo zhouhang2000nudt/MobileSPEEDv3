@@ -4,7 +4,7 @@ import torch.nn as nn
 from typing import List, Union
 from torch import Tensor
 
-from .block import SPPF, FPNPAN, RepECPHead, Conv2dNormActivation
+from .block import SPPF, FPNPAN, RepECPHead, Conv2dNormActivation, DCNv2
 from torchvision.models import mobilenet_v3_large, MobileNet_V3_Large_Weights, mobilenet_v3_small, MobileNet_V3_Small_Weights
 
 class Mobile_SPEEDv3(nn.Module):
@@ -15,6 +15,19 @@ class Mobile_SPEEDv3(nn.Module):
             self.features = mobilenet_v3_large(weights = MobileNet_V3_Large_Weights.DEFAULT).features[:-1]
         else:
             self.features = mobilenet_v3_large().features[:-1]
+        
+        for deform_layer in config["deform_layers"]:
+            InvertedResidual = self.features[deform_layer]
+            in_channels = InvertedResidual.block[0][0].in_channels
+            out_channels = InvertedResidual.block[-1][0].out_channels
+            kernel_size = InvertedResidual.block[1][0].kernel_size
+            stride = InvertedResidual.block[1][0].stride
+            self.features[deform_layer] = DCNv2(
+                in_channels=in_channels,
+                out_channels=out_channels,
+                kernel_size=kernel_size[0],
+                stride=stride[0]
+            )
         
         SPPF_in_channels = 160
         SPPF_out_channels = 160

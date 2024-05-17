@@ -110,6 +110,68 @@ def prepare_Speed(config: dict):
                 v2.Resize(size=config["imgsz"]),
             ]),
             "A_transform": None,
+        },
+        "self_supervised_train": {
+            "transform": v2.Compose([
+                v2.ToTensor(),
+                v2.Resize(size=config["imgsz"]),
+            ]),
+            "A_transform": A.Compose([
+                A.OneOf([
+                    A.AdvancedBlur(blur_limit=(3, 5),
+                                   rotate_limit=25,
+                                   p=0.2),
+                    A.Blur(blur_limit=(3, 5), p=0.2),
+                    A.GaussNoise(var_limit=(5, 15),
+                                 p=0.2),
+                    A.GaussianBlur(blur_limit=(3, 5),
+                                   p=0.2),
+                    ], p=1),
+                A.ColorJitter(brightness=0.2,
+                              contrast=0.2,
+                              saturation=0.2,
+                              hue=0.2,
+                              p=1),
+                A.Affine(translate_percent={"x": (-0.2, 0.2), "y": (-0.2, 0.2)},
+                         p=1),
+                A.Compose([
+                    A.BBoxSafeRandomCrop(p=1.0),
+                    A.PadIfNeeded(min_height=480, min_width=768, border_mode=cv.BORDER_REPLICATE, position="random", p=1.0),
+                ], p=1),
+            ],
+            p=1,
+            bbox_params=A.BboxParams(format="pascal_voc", label_fields=["category_ids"]))
+        },
+        "self_supervised_val": {
+            "transform": v2.Compose([
+                v2.ToTensor(),
+                v2.Resize(size=config["imgsz"]),
+            ]),
+            "A_transform": A.Compose([
+                A.OneOf([
+                    A.AdvancedBlur(blur_limit=(3, 5),
+                                   rotate_limit=25,
+                                   p=0.2),
+                    A.Blur(blur_limit=(3, 5), p=0.2),
+                    A.GaussNoise(var_limit=(5, 15),
+                                 p=0.2),
+                    A.GaussianBlur(blur_limit=(3, 5),
+                                   p=0.2),
+                    ], p=1),
+                A.ColorJitter(brightness=0.2,
+                              contrast=0.2,
+                              saturation=0.2,
+                              hue=0.2,
+                              p=1),
+                A.Affine(translate_percent={"x": (-0.2, 0.2), "y": (-0.2, 0.2)},
+                         p=1),
+                A.Compose([
+                    A.BBoxSafeRandomCrop(p=1.0),
+                    A.PadIfNeeded(min_height=480, min_width=768, border_mode=cv.BORDER_REPLICATE, position="random", p=1.0),
+                ], p=1),
+            ],
+            p=1,
+            bbox_params=A.BboxParams(format="pascal_voc", label_fields=["category_ids"]))
         }
     }
 
@@ -183,7 +245,7 @@ class Speed(Dataset):
     def __init__(self, mode: str = "train"):
         self.A_transform = Speed.transform[mode]["A_transform"]
         self.transform = Speed.transform[mode]["transform"]
-        self.sample_index = Speed.train_index if mode == "train" else Speed.val_index if mode == "val" else Speed.test_index
+        self.sample_index = Speed.train_index if "train" in mode else Speed.val_index if "val" in mode else Speed.test_index
         self.mode = mode
     
     def __len__(self):
@@ -204,7 +266,7 @@ class Speed(Dataset):
             
             # 先进行wrapping
             dice = np.random.rand()
-            if self.mode == "train" and (Speed.config["Rotate"]["Rotate_img"] or Speed.config["Rotate"]["Rotate_cam"]):
+            if "train" in self.mode and (Speed.config["Rotate"]["Rotate_img"] or Speed.config["Rotate"]["Rotate_cam"]):
                 wrapped_time = 0
                 bbox_area = (bbox[2] - bbox[0]) * (bbox[3] - bbox[1])
                 wrapped = False
@@ -235,14 +297,28 @@ class Speed(Dataset):
                     image = image_wrapped
                     pos = pos_wrapped
                     ori = ori_wrapped
-                    bbox = bbox_wrapped   
+                    bbox = bbox_wrapped
             
             # 进行Albumentation增强
-            if self.A_transform is not None:
-                transformed = self.A_transform(image=image, bboxes=[bbox], category_ids=[1])
-                image = transformed["image"]
-                bbox = list(transformed["bboxes"][0])
-                
+            if "self_supervised" in self.mode:
+                transformed_1 = self.A_transform(image=image, bboxes=[bbox], category_ids=[1])
+                image_1 = transformed_1["image"]
+                bbox_1 = list(transformed["bboxes"][0])
+                transformed_2 = self.A_transform(image=image, bboxes=[bbox], category_ids=[1])
+                image_2 = transformed_2["image"]
+                bbox_2 = list(transformed["bboxes"][0])
+            else:
+                if self.A_transform is not None:
+                    transformed = self.A_transform(image=image, bboxes=[bbox], category_ids=[1])
+                    image = transformed["image"]
+                    bbox = list(transformed["bboxes"][0])
+            
+            if "self_supervised" in self.mode:
+                image_1 = self.transform(image_1)       # (1, 480, 768)
+                image_1 = image_1.repeat(3, 1, 1)       # (3, 480, 768)
+                image_2 = self.transform(image_2)       # (1, 480, 768)
+                image_2 = image_2.repeat(3, 1, 1)
+                return image_1, image_2
             
             cls = torch.tensor(self.encode_dict[tuple((ori >= 0).tolist())])
             if Speed.config["cls_dim"] > 16:
@@ -296,6 +372,9 @@ class SpeedDataModule(L.LightningDataModule):
 
     def setup(self, stage: str) -> None:
         if stage == "fit":
+            if self.config["self_supervised"]:
+                self.speed_data_train: Speed = Speed("self_supervised_train")
+                self.speed_data_val: Speed = Speed("self_supervised_val")
             self.speed_data_train: Speed = Speed("train")
             self.speed_data_val: Speed = Speed("val")
         elif stage == "validate":
