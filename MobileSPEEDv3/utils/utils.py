@@ -143,8 +143,8 @@ def wrap_boxes(boxes, M, width, height):
         # tmp_box_3转置一下，就成了(n, 4)形式， (x1,y1,x2,y2)的结果
         xy = np.concatenate((x.min(1), y.min(1), x.max(1), y.max(1))).reshape(4, n).T
         # clip boxes
-        xy[:, [0, 2]] = xy[:, [0, 2]].clip(0, width)
-        xy[:, [1, 3]] = xy[:, [1, 3]].clip(0, height)
+        xy[:, [0, 2]] = xy[:, [0, 2]].clip(0, width-1)
+        xy[:, [1, 3]] = xy[:, [1, 3]].clip(0, height-1)
         return xy.astype(np.float32)
     else:
         return boxes

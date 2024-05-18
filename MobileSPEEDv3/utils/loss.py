@@ -74,13 +74,3 @@ class OriValLoss(nn.Module):
     
     def forward(self, ori_pre, ori_label):
         return self.loss(ori_pre, ori_label)
-
-# ====================分类损失====================
-
-class OriFaceLoss(nn.Module):
-    def __init__(self, loss_type: str, **kwargs):
-        super().__init__()
-        self.loss = get_cls_loss(loss_type, **kwargs)
-
-    def forward(self, cls_pre, cls_label):
-        return self.loss(cls_pre, cls_label)

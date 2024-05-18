@@ -7,7 +7,7 @@ from rich import print
 from functools import partial
 
 from MobileSPEEDv3.utils.config import get_config
-from MobileSPEEDv3.utils.dataset import SpeedDataModule
+from MobileSPEEDv3.utils.dataset import SpeedDataModule, prepare_Speed
 from MobileSPEEDv3.module.Lightning_MobileSPEEDv3 import LightningMobileSPEEDv3
 
 from lightning.pytorch import Trainer

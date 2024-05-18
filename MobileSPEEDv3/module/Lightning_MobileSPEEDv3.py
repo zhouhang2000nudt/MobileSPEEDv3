@@ -7,9 +7,8 @@ import csv
 from torch.optim import SGD, AdamW
 
 from ..model.Mobile_SPPEDv3 import Mobile_SPEEDv3
-from ..utils.loss import PoseLoss, OriValLoss, OriFaceLoss
+from ..utils.loss import PoseLoss, OriValLoss
 from ..utils.metrics import Loss, PosError, OriError, Score
-from ..utils.dataset import Speed
 from ..utils.utils import decode_ori_batch
 
 
@@ -54,14 +53,19 @@ class LightningMobileSPEEDv3(L.LightningModule):
 
 
     def training_step(self, batch, batch_idx):
-        inputs, labels = batch
-        num = inputs.shape[0]
-        # inputs = inputs.to(self.model.features[0][0].weight.dtype)
-        pos, ori = self(inputs)
-        pos = pos.clone()
-        ori = ori.clone()
-        train_pos_loss = self.pos_loss(pos, labels["pos"])
-        train_ori_loss = self.ori_loss(ori, labels["ori_encode"])
+        if self.config["self_supervised"]:
+            image_1, image_2 = batch
+            num = image_1.shape[0]
+            pos_1, ori_1 = self(image_1)
+            pos_2, ori_2 = self(image_2)
+            train_pos_loss = self.pos_loss(pos_1, pos_2)
+            train_ori_loss = self.ori_loss(ori_1, ori_2)
+        else:
+            inputs, labels = batch
+            num = inputs.shape[0]
+            pos, ori = self(inputs)
+            train_pos_loss = self.pos_loss(pos, labels["pos"])
+            train_ori_loss = self.ori_loss(ori, labels["ori_encode"])
 
         train_loss = self.BETA[0] * train_pos_loss + self.BETA[1] * train_ori_loss
 
@@ -89,24 +93,36 @@ class LightningMobileSPEEDv3(L.LightningModule):
     
     def validation_step(self, batch, batch_index):
         # 取出数据
-        inputs, labels = batch
-        num = inputs.shape[0]
-        # 前向传播
-        pos, ori = self(inputs)
-        pos = pos.clone()
-        ori = ori.clone()
-        # 计算损失
-        val_pos_loss = self.pos_loss(pos, labels["pos"])
-        val_ori_loss = self.ori_loss(ori, labels["ori_encode"])
+        if self.config["self_supervised"]:
+            image_1, image_2 = batch
+            num = image_1.shape[0]
+            pos_1, ori_1 = self(image_1)
+            pos_2, ori_2 = self(image_2)
+            val_pos_loss = self.pos_loss(pos_1, pos_2)
+            val_ori_loss = self.ori_loss(ori_1, ori_2)
+            ori_decode_1, _ = decode_ori_batch(ori_1, self.config["B"])
+            ori_decode_2, _ = decode_ori_batch(ori_2, self.config["B"])
+            self.ori_error.update(ori_decode_1, ori_decode_2)
+            self.pos_error.update(pos_1, pos_2)
+        else:
+            inputs, labels = batch
+            num = inputs.shape[0]
+            # 前向传播
+            pos, ori = self(inputs)
+            # 计算损失
+            val_pos_loss = self.pos_loss(pos, labels["pos"])
+            val_ori_loss = self.ori_loss(ori, labels["ori_encode"])
+            ori_decode, _ = decode_ori_batch(ori, self.config["B"])
+            self.ori_error.update(ori_decode, labels["ori"])
+            self.pos_error.update(pos, labels["pos"])
+
         val_loss = self.BETA[0] * val_pos_loss + self.BETA[1] * val_ori_loss
         # 计算指标
         self.val_pos_loss.update(val_pos_loss, num)
         self.val_ori_loss.update(val_ori_loss, num)
         self.val_loss.update(val_loss, num)
         
-        ori_decode, _ = decode_ori_batch(ori, self.config["B"])
-        self.ori_error.update(ori_decode, labels["ori"])
-        self.pos_error.update(pos, labels["pos"])
+        
         if self.config["save_csv"]:
             new_result = [labels["filename"][0],
                         labels["pos"][0][0].item(), labels["pos"][0][1].item(), labels["pos"][0][2].item(),
@@ -115,7 +131,6 @@ class LightningMobileSPEEDv3(L.LightningModule):
                         ori[0][0].item(), ori[0][1].item(), ori[0][2].item(), ori[0][3].item(),
                         self.pos_error.compute().item(), self.ori_error.compute().item()]
             self.result.append(new_result)
-            
             self.pos_error.reset()
             self.ori_error.reset()
 

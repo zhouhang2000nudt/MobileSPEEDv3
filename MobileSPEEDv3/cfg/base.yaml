@@ -21,18 +21,17 @@ self_supervised: false
 data_dir: ../datasets/speed     # 数据路径
 workers: 16            # dataloader workers
 ram: false            # 是否使用内存加载数据
-imgsz: [240, 384]     # 图片大小 [480, 768]
+imgsz: [480, 768]     # 图片大小 [480, 768]
 
 
 # ==========================model==========================
 pos_dim: 3                             # 位置维度
 ori_dim: 4                             # 姿态维度
-N_ORI_BINS_PER_DIM: 8                  # 分类维度
+N_ORI_BINS_PER_DIM: 12                  # 分类维度
 ORI_SMOOTH_FACTOR: 3                   # 姿态平滑因子
 pretrained: true
 deform_layers: []
 neck: FPNPAN                            # FPNPAN/BiFPN/AFPN
-out_channels: [40, 60, 80]                       # neck输出通道数
 expand_ratio: [1.2, 1, 0.8]                 # 扩张率
 pool_size: [3, 2, 1]                # 池化尺寸
 
@@ -72,3 +71,5 @@ Rotate:
   img_angle: 60
   cam_angle: 10
   p: 0.5             # p为图片旋转的概率，(1-p)为相机旋转的概率
+
+CropAndPadding: 0.5

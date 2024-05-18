@@ -224,32 +224,28 @@ class RSC(nn.Module):
 class Head(nn.Module):
     def __init__(self, in_features: int, pos_dim: int, ori_dim: int):
         super(Head, self).__init__()
-        features_ = in_features
-        self.pos_dim = pos_dim
-        self.ori_dim = ori_dim
         self.fc = nn.Sequential(
-            nn.Linear(in_features, in_features // 2),
-            nn.ReLU(inplace=True),
-            nn.Linear(in_features // 2, in_features),
-            nn.LeakyReLU(negative_slope=0.01, inplace=True),
+            nn.Linear(in_features, in_features),
+            nn.Mish(inplace=True),
         )
-        self.pos_features = int(in_features * 0.25)
-        self.ori_features = in_features - self.pos_features
+        pos_hide_features = in_features // 2
+        ori_hide_features = in_features
         self.pos_fc = nn.Sequential(
-            nn.Linear(self.pos_features, pos_dim),
-            # nn.Linear(features_ // 4, pos_dim)
+            nn.Linear(in_features, pos_hide_features),
+            nn.Mish(inplace=True),
+            nn.Linear(pos_hide_features, pos_dim),
         )
         self.ori_fc = nn.Sequential(
-            nn.Linear(self.ori_features, ori_dim),
-            # nn.Linear(features_ // 2, ori_dim),
+            nn.Linear(in_features, ori_hide_features),
+            nn.Mish(inplace=True),
+            nn.Linear(ori_hide_features, ori_dim),
+            nn.Softmax(dim=1),
         )
     
     def forward(self, x):
         x = self.fc(x)
-        pos_feature, ori_feature = torch.split(x, [self.pos_features, self.ori_features], dim=1)
-        pos = self.pos_fc(pos_feature)
-        ori = self.ori_fc(ori_feature)
-        ori = torch.softmax(ori, dim=1)
+        pos = self.pos_fc(x)
+        ori = self.ori_fc(x)
         return pos, ori
 
 class RepECPHead(nn.Sequential):

@@ -6,6 +6,7 @@ from tqdm import tqdm
 from numpy import ndarray
 from .utils import rotate_image, rotate_cam, Camera, wrap_boxes, bbox_in_image, encode_ori
 from PIL import Image
+from typing import List
 
 import albumentations as A
 import cv2 as cv
@@ -15,6 +16,32 @@ import numpy as np
 import json
 import torch
 import itertools
+
+
+
+def CropAndPad(img: np.array, bbox: List[float]):
+    # 对图片进行裁剪
+    # 裁剪后padding回原来的大小
+    x_min, y_min, x_max, y_max = bbox
+    height, width = img.shape[:2]
+    crop_x_min = np.random.randint(0, x_min+1)
+    crop_y_min = np.random.randint(0, y_min+1)
+    crop_x_max = np.random.randint(x_max, width)
+    crop_y_max = np.random.randint(y_max, height)
+    img = img[crop_y_min:crop_y_max+1, crop_x_min:crop_x_max+1]
+    img = cv.copyMakeBorder(img, crop_y_min, 0, 0, 0,
+                            np.random.choice([cv.BORDER_REPLICATE, cv.BORDER_CONSTANT]),
+                            value=(np.random.randint(0, 256), np.random.randint(0, 256), np.random.randint(0, 256)))
+    img = cv.copyMakeBorder(img, 0, height-crop_y_max-1, 0, 0,
+                            np.random.choice([cv.BORDER_REPLICATE, cv.BORDER_CONSTANT]),
+                            value=(np.random.randint(0, 256), np.random.randint(0, 256), np.random.randint(0, 256)))
+    img = cv.copyMakeBorder(img, 0, 0, crop_x_min, 0,
+                            np.random.choice([cv.BORDER_REPLICATE, cv.BORDER_CONSTANT]),
+                            value=(np.random.randint(0, 256), np.random.randint(0, 256), np.random.randint(0, 256)))
+    img = cv.copyMakeBorder(img, 0, 0, 0, width-crop_x_max-1,
+                            np.random.choice([cv.BORDER_REPLICATE, cv.BORDER_CONSTANT]),
+                            value=(np.random.randint(0, 256), np.random.randint(0, 256), np.random.randint(0, 256)))
+    return img
 
 
 class MultiEpochsDataLoader(torch.utils.data.DataLoader):
@@ -67,31 +94,20 @@ def prepare_Speed(config: dict):
             ]),
             "A_transform": A.Compose([
                 A.OneOf([
-                    A.AdvancedBlur(blur_limit=(3, 5),
+                    A.AdvancedBlur(blur_limit=(3, 7),
                                    rotate_limit=25,
                                    p=0.2),
-                    A.Blur(blur_limit=(3, 5), p=0.2),
+                    A.Blur(blur_limit=(3, 7), p=0.2),
                     A.GaussNoise(var_limit=(5, 15),
                                  p=0.2),
-                    A.GaussianBlur(blur_limit=(3, 5),
+                    A.GaussianBlur(blur_limit=(3, 7),
                                    p=0.2),
                     ], p=0.2),
-                # A.ImageCompression(
-                #     quality_lower=95,
-                #     quality_upper=100,
-                #     p=0.2
-                # ),
-                A.ColorJitter(brightness=0.2,
-                              contrast=0.2,
-                              saturation=0.2,
-                              hue=0.2,
+                A.ColorJitter(brightness=0.3,
+                              contrast=0.3,
+                              saturation=0.3,
+                              hue=0.3,
                               p=0.2),
-                # A.Affine(translate_percent={"x": (-0.2, 0.2), "y": (-0.2, 0.2)},
-                #          p=0.2),
-                # A.Compose([
-                #     A.BBoxSafeRandomCrop(p=1.0),
-                #     A.PadIfNeeded(min_height=480, min_width=768, border_mode=cv.BORDER_REPLICATE, position="random", p=1.0),
-                # ], p=1),
             ],
             p=1,
             bbox_params=A.BboxParams(format="pascal_voc", label_fields=["category_ids"]))
@@ -118,25 +134,25 @@ def prepare_Speed(config: dict):
             ]),
             "A_transform": A.Compose([
                 A.OneOf([
-                    A.AdvancedBlur(blur_limit=(3, 5),
+                    A.AdvancedBlur(blur_limit=(3, 7),
                                    rotate_limit=25,
                                    p=0.2),
-                    A.Blur(blur_limit=(3, 5), p=0.2),
+                    A.Blur(blur_limit=(3, 7), p=0.2),
                     A.GaussNoise(var_limit=(5, 15),
                                  p=0.2),
-                    A.GaussianBlur(blur_limit=(3, 5),
+                    A.GaussianBlur(blur_limit=(3, 7),
                                    p=0.2),
                     ], p=1),
-                A.ColorJitter(brightness=0.2,
-                              contrast=0.2,
-                              saturation=0.2,
-                              hue=0.2,
+                A.ColorJitter(brightness=0.3,
+                              contrast=0.3,
+                              saturation=0.3,
+                              hue=0.3,
                               p=1),
                 A.Affine(translate_percent={"x": (-0.2, 0.2), "y": (-0.2, 0.2)},
                          p=1),
                 A.Compose([
                     A.BBoxSafeRandomCrop(p=1.0),
-                    A.PadIfNeeded(min_height=480, min_width=768, border_mode=cv.BORDER_REPLICATE, position="random", p=1.0),
+                    A.PadIfNeeded(min_height=1200, min_width=1920, border_mode=cv.BORDER_REPLICATE, position="random", p=1.0),
                 ], p=1),
             ],
             p=1,
@@ -147,38 +163,43 @@ def prepare_Speed(config: dict):
                 v2.ToTensor(),
                 v2.Resize(size=config["imgsz"]),
             ]),
-            "A_transform": A.Compose([
-                A.OneOf([
-                    A.AdvancedBlur(blur_limit=(3, 5),
-                                   rotate_limit=25,
-                                   p=0.2),
-                    A.Blur(blur_limit=(3, 5), p=0.2),
-                    A.GaussNoise(var_limit=(5, 15),
-                                 p=0.2),
-                    A.GaussianBlur(blur_limit=(3, 5),
-                                   p=0.2),
-                    ], p=1),
-                A.ColorJitter(brightness=0.2,
-                              contrast=0.2,
-                              saturation=0.2,
-                              hue=0.2,
-                              p=1),
+            "A_transform": [A.Compose([
+                A.Flip(p=0.5),
                 A.Affine(translate_percent={"x": (-0.2, 0.2), "y": (-0.2, 0.2)},
                          p=1),
+                A.SafeRotate(limit=180, p=1.0),
                 A.Compose([
                     A.BBoxSafeRandomCrop(p=1.0),
-                    A.PadIfNeeded(min_height=480, min_width=768, border_mode=cv.BORDER_REPLICATE, position="random", p=1.0),
-                ], p=1),
+                    A.PadIfNeeded(min_height=1200, min_width=1920, border_mode=cv.BORDER_REPLICATE, position="random", p=1.0),
+                ], p=1)
+            ],
+            p=1,
+            bbox_params=A.BboxParams(format="pascal_voc", label_fields=["category_ids"])),
+            A.Compose([
+                A.OneOf([
+                    A.AdvancedBlur(blur_limit=(3, 7),
+                                   rotate_limit=25,
+                                   p=0.2),
+                    A.Blur(blur_limit=(3, 7), p=0.2),
+                    A.GaussNoise(var_limit=(5, 15),
+                                 p=0.2),
+                    A.GaussianBlur(blur_limit=(3, 7),
+                                   p=0.2),
+                    ], p=1),
+                A.ColorJitter(brightness=0.3,
+                              contrast=0.3,
+                              saturation=0.3,
+                              hue=0.3,
+                              p=1)
             ],
             p=1,
             bbox_params=A.BboxParams(format="pascal_voc", label_fields=["category_ids"]))
+            ]
         }
     }
 
     # 设置标签字典
     Speed.labels = json.load(open(Speed.label_file, "r"))
-    # Speed.test_labels = json.load(open(Speed.data_dir / "test.json", "r"))
-    # Speed.test_labels.extend(json.load(open(Speed.data_dir / "real_test.json", "r")))
     
     # 采样列表
     Speed.img_name = list(Speed.labels.keys())
@@ -193,16 +214,6 @@ def prepare_Speed(config: dict):
         Speed.img_dict = {}
         Speed.read_img()
         Speed.fake_img = np.zeros((1200, 1980, 3), dtype=np.uint8)
-    
-    # 生成所有可能的布尔值组合
-    # bool_values = [True, False]
-    # combinations = list(itertools.product(bool_values, repeat=4))
-    # # 将布尔值组合转换为独热编码
-    # for i, combo in enumerate(combinations):
-    #     one_hot = [0] * 16
-    #     one_hot[i] = 1
-    #     Speed.encode_dict[combo] = one_hot
-    #     Speed.decode_dict[i] = combo
 
 
 class ImageReader(Thread):
@@ -238,8 +249,6 @@ class Speed(Dataset):
     img_dict: dict = {} # 图片字典
     fake_img: ndarray       # 伪图片
     camera: Camera = Camera
-    encode_dict: dict = {}  # 编码姿态的字典
-    decode_dict: dict = {}  # 解码姿态的字典
     
 
     def __init__(self, mode: str = "train"):
@@ -253,99 +262,104 @@ class Speed(Dataset):
 
     def __getitem__(self, index) -> tuple:
         filename = self.sample_index[index].strip()                  # 图片文件名
+        print(filename)
         if Speed.config["ram"]:
             image = Speed.img_dict[filename]                         # 伪图片
         else:
             image = cv.imread(str(self.image_dir / filename), cv.IMREAD_GRAYSCALE)       # 读取图片
         
-        if self.mode != "test":
-            ori = torch.tensor(self.labels[filename]["ori"])   # 姿态  (,4)
-            pos = torch.tensor(self.labels[filename]["pos"])   # 位置  (,3)
+        ori = torch.tensor(self.labels[filename]["ori"])   # 姿态  (,4)
+        pos = torch.tensor(self.labels[filename]["pos"])   # 位置  (,3)
+        
+        bbox = self.labels[filename]["bbox"]
+        if bbox[2] >= 1920:
+            bbox[2] = 1919
+        if bbox[3] >= 1200:
+            bbox[3] = 1199
+        
+        # 先进行wrapping
+        dice = np.random.rand()
+        if ("train" in self.mode or "self_supervised" in self.mode) and (Speed.config["Rotate"]["Rotate_img"] or Speed.config["Rotate"]["Rotate_cam"]):
+            wrapped_time = 0
+            bbox_area = (bbox[2] - bbox[0]) * (bbox[3] - bbox[1])
+            wrapped = False
+            if Speed.config["Rotate"]["Rotate_img"] and dice <= Speed.config["Rotate"]["p"]:
+                while True:
+                    if wrapped_time > 10:
+                        wrapped = False
+                        break
+                    wrapped_time += 1
+                    image_wrapped, pos_wrapped, ori_wrapped, M_wrapped = rotate_image(image, pos, ori, Speed.camera.K, Speed.config["Rotate"]["img_angle"])
+                    bbox_wrapped = wrap_boxes(np.array([bbox]), M_wrapped, height=1200, width=1920).tolist()[0]
+                    if bbox_in_image(bbox_wrapped, bbox_area):
+                        wrapped = True
+                        break
+            elif Speed.config["Rotate"]["Rotate_cam"] and dice > Speed.config["Rotate"]["p"]:
+                while True:
+                    if wrapped_time > 10:
+                        wrapped = False
+                        break
+                    wrapped_time += 1
+                    image_wrapped, pos_wrapped, ori_wrapped, M_wrapped = rotate_cam(image, pos, ori, Speed.camera.K, Speed.config["Rotate"]["cam_angle"])
+                    bbox_wrapped = wrap_boxes(np.array([bbox]), M_wrapped, height=1200, width=1920).tolist()[0]
+                    if bbox_in_image(bbox_wrapped, bbox_area):
+                        wrapped = True
+                        break
             
-            bbox = self.labels[filename]["bbox"]
-            
-            # 先进行wrapping
-            dice = np.random.rand()
-            if "train" in self.mode and (Speed.config["Rotate"]["Rotate_img"] or Speed.config["Rotate"]["Rotate_cam"]):
-                wrapped_time = 0
-                bbox_area = (bbox[2] - bbox[0]) * (bbox[3] - bbox[1])
-                wrapped = False
-                if Speed.config["Rotate"]["Rotate_img"] and dice <= Speed.config["Rotate"]["p"]:
-                    while True:
-                        if wrapped_time > 10:
-                            wrapped = False
-                            break
-                        wrapped_time += 1
-                        image_wrapped, pos_wrapped, ori_wrapped, M_wrapped = rotate_image(image, pos, ori, Speed.camera.K, Speed.config["Rotate"]["img_angle"])
-                        bbox_wrapped = wrap_boxes(np.array([bbox]), M_wrapped, height=1200, width=1920).tolist()[0]
-                        if bbox_in_image(bbox_wrapped, bbox_area):
-                            wrapped = True
-                            break
-                elif Speed.config["Rotate"]["Rotate_cam"] and dice > Speed.config["Rotate"]["p"]:
-                    while True:
-                        if wrapped_time > 10:
-                            wrapped = False
-                            break
-                        wrapped_time += 1
-                        image_wrapped, pos_wrapped, ori_wrapped, M_wrapped = rotate_cam(image, pos, ori, Speed.camera.K, Speed.config["Rotate"]["cam_angle"])
-                        bbox_wrapped = wrap_boxes(np.array([bbox]), M_wrapped, height=1200, width=1920).tolist()[0]
-                        if bbox_in_image(bbox_wrapped, bbox_area):
-                            wrapped = True
-                            break
-                        
-                if wrapped:
-                    image = image_wrapped
-                    pos = pos_wrapped
-                    ori = ori_wrapped
-                    bbox = bbox_wrapped
-            
-            # 进行Albumentation增强
-            if "self_supervised" in self.mode:
-                transformed_1 = self.A_transform(image=image, bboxes=[bbox], category_ids=[1])
-                image_1 = transformed_1["image"]
-                bbox_1 = list(transformed["bboxes"][0])
-                transformed_2 = self.A_transform(image=image, bboxes=[bbox], category_ids=[1])
-                image_2 = transformed_2["image"]
-                bbox_2 = list(transformed["bboxes"][0])
-            else:
-                if self.A_transform is not None:
-                    transformed = self.A_transform(image=image, bboxes=[bbox], category_ids=[1])
-                    image = transformed["image"]
-                    bbox = list(transformed["bboxes"][0])
-            
-            if "self_supervised" in self.mode:
-                image_1 = self.transform(image_1)       # (1, 480, 768)
-                image_1 = image_1.repeat(3, 1, 1)       # (3, 480, 768)
-                image_2 = self.transform(image_2)       # (1, 480, 768)
-                image_2 = image_2.repeat(3, 1, 1)
-                return image_1, image_2
-            
-            # cls = torch.tensor(self.encode_dict[tuple((ori >= 0).tolist())])
-            # if Speed.config["cls_dim"] > 16:
-            #     cls = torch.cat((cls, torch.zeros(Speed.config["cls_dim"] - 16)))
-            # ori = ori ** 2
-            ori_encode = encode_ori(ori,
-                                    Speed.config["H_MAP"],
-                                    Speed.config["REDUNDANT_FLAGS"],
-                                    Speed.config["ORI_SMOOTH_FACTOR"],
-                                    Speed.config["N_ORI_BINS_PER_DIM"])
-            
-            y: dict = {
-                "filename": filename,
-                "pos": pos,
-                "ori": ori,
-                "ori_encode": ori_encode,
-                # "cls": cls,
-                "bbox": bbox
-            }
+            if wrapped:
+                image = image_wrapped
+                pos = pos_wrapped
+                ori = ori_wrapped
+                bbox = list(map(int, bbox_wrapped))
+        
+        # 进行Albumentation增强
+        if "self_supervised" in self.mode:
+            # 空间变换
+            transformed = self.A_transform[0](image=image, bboxes=[bbox], category_ids=[1])
+            image = transformed["image"]
+            bbox = list(map(int, list(transformed["bboxes"][0])))
+            # 像素变换
+            transformed_1 = self.A_transform[1](image=image, bboxes=[bbox], category_ids=[1])
+            image_1 = transformed_1["image"]
+            bbox_1 = list(map(int, list(transformed_1["bboxes"][0])))
+            image_1 = CropAndPad(image_1, bbox_1)
+            transformed_2 = self.A_transform[1](image=image, bboxes=[bbox], category_ids=[1])
+            image_2 = transformed_2["image"]
+            bbox_2 = list(map(int, list(transformed_2["bboxes"][0])))
+            image_2 = CropAndPad(image_2, bbox_2)
         else:
-            y: dict = {
-                "filename": filename,
-            }
+            if self.A_transform is not None:
+                transformed = self.A_transform(image=image, bboxes=[bbox], category_ids=[1])
+                image = transformed["image"]
+                dice = np.random.rand()
+                if dice < Speed.config["CropAndPadding"]:
+                    image = CropAndPad(image, bbox)
+                bbox = list(map(int, list(transformed["bboxes"][0])))
+        
+        if "self_supervised" in self.mode:
+            image_1 = self.transform(image_1)       # (1, 480, 768)
+            image_1 = image_1.repeat(3, 1, 1)       # (3, 480, 768)
+            image_2 = self.transform(image_2)       # (1, 480, 768)
+            image_2 = image_2.repeat(3, 1, 1)
+            return image_1, image_2
         
         # 使用torchvision转换图片
-        image = self.transform(image)       # (1, 480, 768)
-        image = image.repeat(3, 1, 1)       # (3, 480, 768)
+        # image = self.transform(image)       # (1, 480, 768)
+        # image = image.repeat(3, 1, 1)       # (3, 480, 768)
+        
+        ori_encode = encode_ori(ori,
+                                Speed.config["H_MAP"],
+                                Speed.config["REDUNDANT_FLAGS"],
+                                Speed.config["ORI_SMOOTH_FACTOR"],
+                                Speed.config["N_ORI_BINS_PER_DIM"])
+        
+        y: dict = {
+            "filename": filename,
+            "pos": pos,
+            "ori": ori,
+            "ori_encode": ori_encode,
+            "bbox": bbox
+        }
 
         return image, y
 
@@ -381,8 +395,9 @@ class SpeedDataModule(L.LightningDataModule):
             if self.config["self_supervised"]:
                 self.speed_data_train: Speed = Speed("self_supervised_train")
                 self.speed_data_val: Speed = Speed("self_supervised_val")
-            self.speed_data_train: Speed = Speed("train")
-            self.speed_data_val: Speed = Speed("val")
+            else:
+                self.speed_data_train: Speed = Speed("train")
+                self.speed_data_val: Speed = Speed("val")
         elif stage == "validate":
             self.speed_data_val: Speed = Speed("val")
     
