@@ -262,7 +262,7 @@ class Speed(Dataset):
 
     def __getitem__(self, index) -> tuple:
         filename = self.sample_index[index].strip()                  # 图片文件名
-        print(filename)
+        # print(filename)
         if Speed.config["ram"]:
             image = Speed.img_dict[filename]                         # 伪图片
         else:
@@ -344,8 +344,8 @@ class Speed(Dataset):
             return image_1, image_2
         
         # 使用torchvision转换图片
-        # image = self.transform(image)       # (1, 480, 768)
-        # image = image.repeat(3, 1, 1)       # (3, 480, 768)
+        image = self.transform(image)       # (1, 480, 768)
+        image = image.repeat(3, 1, 1)       # (3, 480, 768)
         
         ori_encode = encode_ori(ori,
                                 Speed.config["H_MAP"],
