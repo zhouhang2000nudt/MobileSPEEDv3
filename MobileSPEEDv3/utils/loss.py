@@ -74,3 +74,13 @@ class OriValLoss(nn.Module):
     
     def forward(self, ori_pre, ori_label):
         return self.loss(ori_pre, ori_label)
+
+
+# ===================euler loss===================
+class EulerLoss(nn.Module):
+    def __init__(self, loss_type: str, **kwargs):
+        super(EulerLoss, self).__init__()
+        self.loss = get_cls_loss(loss_type, **kwargs)
+    
+    def forward(self, euler_pre, euler_label):
+        return self.loss(euler_pre, euler_label)

@@ -4,8 +4,7 @@ from pathlib import Path
 from threading import Thread
 from tqdm import tqdm
 from numpy import ndarray
-from .utils import rotate_image, rotate_cam, Camera, wrap_boxes, bbox_in_image, encode_ori
-from PIL import Image
+from .utils import rotate_image, rotate_cam, Camera, wrap_boxes, bbox_in_image, OriEncoderDecoder
 from typing import List
 
 import albumentations as A
@@ -15,7 +14,6 @@ import numpy as np
 
 import json
 import torch
-import itertools
 
 
 
@@ -29,18 +27,10 @@ def CropAndPad(img: np.array, bbox: List[float]):
     crop_x_max = np.random.randint(x_max, width)
     crop_y_max = np.random.randint(y_max, height)
     img = img[crop_y_min:crop_y_max+1, crop_x_min:crop_x_max+1]
-    img = cv.copyMakeBorder(img, crop_y_min, 0, 0, 0,
-                            np.random.choice([cv.BORDER_REPLICATE, cv.BORDER_CONSTANT]),
-                            value=(np.random.randint(0, 256), np.random.randint(0, 256), np.random.randint(0, 256)))
-    img = cv.copyMakeBorder(img, 0, height-crop_y_max-1, 0, 0,
-                            np.random.choice([cv.BORDER_REPLICATE, cv.BORDER_CONSTANT]),
-                            value=(np.random.randint(0, 256), np.random.randint(0, 256), np.random.randint(0, 256)))
-    img = cv.copyMakeBorder(img, 0, 0, crop_x_min, 0,
-                            np.random.choice([cv.BORDER_REPLICATE, cv.BORDER_CONSTANT]),
-                            value=(np.random.randint(0, 256), np.random.randint(0, 256), np.random.randint(0, 256)))
-    img = cv.copyMakeBorder(img, 0, 0, 0, width-crop_x_max-1,
-                            np.random.choice([cv.BORDER_REPLICATE, cv.BORDER_CONSTANT]),
-                            value=(np.random.randint(0, 256), np.random.randint(0, 256), np.random.randint(0, 256)))
+    img = cv.copyMakeBorder(img, crop_y_min, 0, 0, 0, cv.BORDER_REPLICATE)
+    img = cv.copyMakeBorder(img, 0, height-crop_y_max-1, 0, 0, cv.BORDER_REPLICATE)
+    img = cv.copyMakeBorder(img, 0, 0, crop_x_min, 0, cv.BORDER_REPLICATE)
+    img = cv.copyMakeBorder(img, 0, 0, 0, width-crop_x_max-1, cv.BORDER_REPLICATE)
     return img
 
 
@@ -213,7 +203,9 @@ def prepare_Speed(config: dict):
     if Speed.config["ram"]:
         Speed.img_dict = {}
         Speed.read_img()
-        Speed.fake_img = np.zeros((1200, 1980, 3), dtype=np.uint8)
+    
+    # 设置姿态编码解码器
+    Speed.ori_encoder_decoder = OriEncoderDecoder(Speed.config["stride"], Speed.config["alpha"], Speed.config["neighbour"])
 
 
 class ImageReader(Thread):
@@ -247,8 +239,8 @@ class Speed(Dataset):
     val_index: Subset       # 验证集图片名列表
     test_index: list        # 测试集图片名列表
     img_dict: dict = {} # 图片字典
-    fake_img: ndarray       # 伪图片
     camera: Camera = Camera
+    ori_encoder_decoder: OriEncoderDecoder
     
 
     def __init__(self, mode: str = "train"):
@@ -262,14 +254,14 @@ class Speed(Dataset):
 
     def __getitem__(self, index) -> tuple:
         filename = self.sample_index[index].strip()                  # 图片文件名
-        # print(filename)
+        # filename = "img000001.jpg"
         if Speed.config["ram"]:
             image = Speed.img_dict[filename]                         # 伪图片
         else:
             image = cv.imread(str(self.image_dir / filename), cv.IMREAD_GRAYSCALE)       # 读取图片
         
-        ori = torch.tensor(self.labels[filename]["ori"])   # 姿态  (,4)
-        pos = torch.tensor(self.labels[filename]["pos"])   # 位置  (,3)
+        ori = np.array(self.labels[filename]["ori"])   # 姿态
+        pos = np.array(self.labels[filename]["pos"])   # 位置
         
         bbox = self.labels[filename]["bbox"]
         if bbox[2] >= 1920:
@@ -347,17 +339,15 @@ class Speed(Dataset):
         image = self.transform(image)       # (1, 480, 768)
         image = image.repeat(3, 1, 1)       # (3, 480, 768)
         
-        ori_encode = encode_ori(ori,
-                                Speed.config["H_MAP"],
-                                Speed.config["REDUNDANT_FLAGS"],
-                                Speed.config["ORI_SMOOTH_FACTOR"],
-                                Speed.config["N_ORI_BINS_PER_DIM"])
+        yaw_encode, pitch_encode, roll_encode = Speed.ori_encoder_decoder.encode_ori(ori)
         
         y: dict = {
             "filename": filename,
             "pos": pos,
             "ori": ori,
-            "ori_encode": ori_encode,
+            "yaw_encode": yaw_encode,
+            "pitch_encode": pitch_encode,
+            "roll_encode": roll_encode,
             "bbox": bbox
         }
 

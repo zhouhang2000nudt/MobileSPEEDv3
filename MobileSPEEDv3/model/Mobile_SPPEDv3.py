@@ -42,7 +42,9 @@ class Mobile_SPEEDv3(nn.Module):
                                      expand_ratio=config["expand_ratio"],
                                      pool_size=config["pool_size"],
                                      pos_dim=config["pos_dim"],
-                                     ori_dim=config["N_ORI_BINS_PER_DIM"] ** 3)
+                                     yaw_dim=int(360 // config["stride"] + 1 + 2 * config["neighbour"]),
+                                     pitch_dim=int(180 // config["stride"] + 1 + 2 * config["neighbour"]),
+                                     roll_dim=int(360 // config["stride"] + 1 + 2 * config["neighbour"]))
         
     def forward(self, x: Tensor):
         p3 = self.features[:7](x)
@@ -53,8 +55,8 @@ class Mobile_SPEEDv3(nn.Module):
         
         p3, p4, p5 = self.FPNPAN([p3, p4, p5])
         
-        pos, ori = self.RepECPHead([p3, p4, p5])
-        return pos, ori
+        pos, yaw, pitch, roll = self.RepECPHead([p3, p4, p5])
+        return pos, yaw, pitch, roll
 
     def switch_repvggplus_to_deploy(self):
         for m in self.modules():

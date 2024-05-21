@@ -222,40 +222,47 @@ class RSC(nn.Module):
 
 
 class Head(nn.Module):
-    def __init__(self, in_features: int, pos_dim: int, ori_dim: int):
+    def __init__(self, in_features: int, pos_dim: int, yaw_dim: int, pitch_dim: int, roll_dim: int):
         super(Head, self).__init__()
         self.fc = nn.Sequential(
             nn.Linear(in_features, in_features),
             nn.Mish(inplace=True),
         )
-        pos_hide_features = in_features // 2
-        ori_hide_features = in_features
+        self.pos_hide_features = int(in_features * 0.25)
+        self.ori_hide_features = in_features - self.pos_hide_features
         self.pos_fc = nn.Sequential(
-            nn.Linear(in_features, pos_hide_features),
-            nn.Mish(inplace=True),
-            nn.Linear(pos_hide_features, pos_dim),
+            nn.Linear(self.pos_hide_features, pos_dim),
         )
-        self.ori_fc = nn.Sequential(
-            nn.Linear(in_features, ori_hide_features),
-            nn.Mish(inplace=True),
-            nn.Linear(ori_hide_features, ori_dim),
+        self.yaw_fc = nn.Sequential(
+            nn.Linear(self.ori_hide_features, yaw_dim),
+            nn.Softmax(dim=1),
+        )
+        self.pitch_fc = nn.Sequential(
+            nn.Linear(self.ori_hide_features, pitch_dim),
+            nn.Softmax(dim=1),
+        )
+        self.roll_fc = nn.Sequential(
+            nn.Linear(self.ori_hide_features, roll_dim),
             nn.Softmax(dim=1),
         )
     
     def forward(self, x):
         x = self.fc(x)
-        pos = self.pos_fc(x)
-        ori = self.ori_fc(x)
-        return pos, ori
+        pos_feature, ori_feature = torch.split(x, [self.pos_hide_features, self.ori_hide_features], dim=1)
+        pos = self.pos_fc(pos_feature)
+        yaw = self.yaw_fc(ori_feature)
+        pitch = self.pitch_fc(ori_feature)
+        roll = self.roll_fc(ori_feature)
+        return pos, yaw, pitch, roll
 
 class RepECPHead(nn.Sequential):
-    def __init__(self, in_channels: List[int], expand_ratio: Union[int, List[float]], pool_size: List[int], pos_dim: int, ori_dim: int):
+    def __init__(self, in_channels: List[int], expand_ratio: Union[int, List[float]], pool_size: List[int], pos_dim: int, yaw_dim: int, pitch_dim: int, roll_dim: int):
         if isinstance(expand_ratio, int):
             expand_ratio = [expand_ratio] * 3
         super(RepECPHead, self).__init__(
             ECP(in_channels, expand_ratio, pool_size),
             RSC(),
-            Head(sum([int(in_channels[i] * expand_ratio[i] * pool_size[i]**2) for i in range(3)]), pos_dim, ori_dim),
+            Head(sum([int(in_channels[i] * expand_ratio[i] * pool_size[i]**2) for i in range(3)]), pos_dim, yaw_dim, pitch_dim, roll_dim),
         )
 
 
