@@ -120,18 +120,18 @@ def prepare_Speed(config: dict):
                                  p=0.5),
                     A.GaussianBlur(blur_limit=(3, 7),
                                    p=0.5),
-                    ], p=0.5),
+                    ], p=0.2),
                 A.ColorJitter(brightness=0.3,
                               contrast=0.3,
                               saturation=0.3,
                               hue=0.3,
-                              p=0.5),
-                A.RandomSunFlare(flare_roi=(0, 0, 1, 1),
-                                 p=0.5),
+                              p=0.2),
+                # A.RandomSunFlare(flare_roi=(0, 0, 1, 1),
+                #                  p=0),
                 A.OneOf([
                     A.GaussNoise(p=0.5),
-                    A.ISONoise(p=0.5)
-                ], p=0.5),
+                    # A.ISONoise(p=0.5)
+                ], p=0.2),
             ],
             p=1,
             bbox_params=A.BboxParams(format="pascal_voc", label_fields=["category_ids"]))
@@ -293,7 +293,7 @@ class Speed(Dataset):
             image = Speed.img_dict[filename]
         else:
             image = cv.imread(str(self.image_dir / filename), cv.IMREAD_GRAYSCALE)       # 读取图片
-        image = cv.cvtColor(image, cv.COLOR_GRAY2RGB)       # 转换为RGB格式
+        # image = cv.cvtColor(image, cv.COLOR_GRAY2RGB)       # 转换为RGB格式
         
         ori = np.array(self.labels[filename]["ori"])   # 姿态
         pos = np.array(self.labels[filename]["pos"])   # 位置
@@ -374,7 +374,7 @@ class Speed(Dataset):
         
         # 使用torchvision转换图片
         image = self.transform(image)       # (3, 480, 768)
-        # image = image.repeat(3, 1, 1)       # (3, 480, 768)
+        image = image.repeat(3, 1, 1)       # (3, 480, 768)
         
         yaw_encode, pitch_encode, roll_encode = Speed.ori_encoder_decoder.encode_ori(ori)
         
