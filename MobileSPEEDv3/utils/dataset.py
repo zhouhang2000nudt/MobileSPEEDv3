@@ -252,7 +252,7 @@ class ImageReader(Thread):
     
     def run(self):
         for img_name in tqdm(self.image_name):
-            img = cv.imread(str(self.image_dir / img_name))
+            img = cv.imread(str(self.image_dir / img_name), cv.IMREAD_GRAYSCALE)
             self.img_dict[img_name] = img
     
     def get_result(self) -> dict:
@@ -292,7 +292,8 @@ class Speed(Dataset):
         if Speed.config["ram"]:
             image = Speed.img_dict[filename]
         else:
-            image = cv.imread(str(self.image_dir / filename))       # 读取图片
+            image = cv.imread(str(self.image_dir / filename), cv.IMREAD_GRAYSCALE)       # 读取图片
+        image = cv.cvtColor(image, cv.COLOR_GRAY2RGB)       # 转换为RGB格式
         
         ori = np.array(self.labels[filename]["ori"])   # 姿态
         pos = np.array(self.labels[filename]["pos"])   # 位置
