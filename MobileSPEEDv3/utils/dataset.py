@@ -33,6 +33,34 @@ def CropAndPad(img: np.array, bbox: List[float]):
     img = cv.copyMakeBorder(img, 0, 0, 0, width-crop_x_max-1, cv.BORDER_REPLICATE)
     return img
 
+def DropBlockSafe(img: np.array, bbox: List[float], drop_num_lim: int):
+    # 随机丢弃部分图片中的一些块
+    # 丢弃块不覆盖bbox
+    
+    assert drop_num_lim > 0, "drop_num_lim must be greater than 0" 
+    
+    x_min, y_min, x_max, y_max = bbox
+    height, width = img.shape[:2]
+    drop_num = np.random.randint(1, drop_num_lim+1)
+    area_dict = {
+        0: [0, 0, x_min-1, height-1],
+        1: [0, 0, width-1, y_min-1],
+        2: [x_max+1, 0, width-1, height-1],
+        3: [0, y_max+1, width-1, height-1]
+    }
+    for i in range(drop_num):
+        area = np.random.randint(0, 4)
+        area_x_min, area_y_min, area_x_max, area_y_max = area_dict[area]
+        try:
+            drop_x_min = np.random.randint(area_x_min, area_x_max+1)
+            drop_y_min = np.random.randint(area_y_min, area_y_max+1)
+            drop_x_max = np.random.randint(drop_x_min, area_x_max+1)
+            drop_y_max = np.random.randint(drop_y_min, area_y_max+1)
+            img[drop_y_min:drop_y_max+1, drop_x_min:drop_x_max+1] = 128
+        except:
+            pass
+    return img
+        
 
 class MultiEpochsDataLoader(torch.utils.data.DataLoader):
     def __init__(self, *args, **kwargs):
@@ -86,18 +114,24 @@ def prepare_Speed(config: dict):
                 A.OneOf([
                     A.AdvancedBlur(blur_limit=(3, 7),
                                    rotate_limit=25,
-                                   p=0.2),
+                                   p=0.5),
                     A.Blur(blur_limit=(3, 7), p=0.2),
                     A.GaussNoise(var_limit=(5, 15),
-                                 p=0.2),
+                                 p=0.5),
                     A.GaussianBlur(blur_limit=(3, 7),
-                                   p=0.2),
-                    ], p=0.2),
+                                   p=0.5),
+                    ], p=0.5),
                 A.ColorJitter(brightness=0.3,
                               contrast=0.3,
                               saturation=0.3,
                               hue=0.3,
-                              p=0.2),
+                              p=0.5),
+                # A.RandomSunFlare(flare_roi=(0, 0, 1, 1),
+                #                  p=0.5),
+                A.OneOf([
+                    A.GaussNoise(p=0.5),
+                    A.ISONoise(p=0.5)
+                ])
             ],
             p=1,
             bbox_params=A.BboxParams(format="pascal_voc", label_fields=["category_ids"]))
@@ -256,7 +290,7 @@ class Speed(Dataset):
         filename = self.sample_index[index].strip()                  # 图片文件名
         # filename = "img000001.jpg"
         if Speed.config["ram"]:
-            image = Speed.img_dict[filename]                         # 伪图片
+            image = Speed.img_dict[filename]
         else:
             image = cv.imread(str(self.image_dir / filename), cv.IMREAD_GRAYSCALE)       # 读取图片
         
@@ -324,20 +358,24 @@ class Speed(Dataset):
                 transformed = self.A_transform(image=image, bboxes=[bbox], category_ids=[1])
                 image = transformed["image"]
                 dice = np.random.rand()
-                if dice < Speed.config["CropAndPadding"]:
+                if dice < Speed.config["CropAndPadding"]["p"]:
                     image = CropAndPad(image, bbox)
+                dice = np.random.rand()
+                if dice < Speed.config["DropBlockSafe"]["p"]:
+                    image = DropBlockSafe(image, bbox=bbox, drop_num_lim=Speed.config["DropBlockSafe"]["drop_num_lim"])
+                dice = np.random.rand()
                 bbox = list(map(int, list(transformed["bboxes"][0])))
         
         if "self_supervised" in self.mode:
             image_1 = self.transform(image_1)       # (1, 480, 768)
             image_1 = image_1.repeat(3, 1, 1)       # (3, 480, 768)
             image_2 = self.transform(image_2)       # (1, 480, 768)
-            image_2 = image_2.repeat(3, 1, 1)
+            image_2 = image_2.repeat(3, 1, 1)       # (3, 480, 768)
             return image_1, image_2
         
         # 使用torchvision转换图片
-        image = self.transform(image)       # (1, 480, 768)
-        image = image.repeat(3, 1, 1)       # (3, 480, 768)
+        # image = self.transform(image)       # (1, 480, 768)
+        # image = image.repeat(3, 1, 1)       # (3, 480, 768)
         
         yaw_encode, pitch_encode, roll_encode = Speed.ori_encoder_decoder.encode_ori(ori)
         

@@ -42,8 +42,8 @@ def CropAndPad(img: np.array, bbox: List[float]):
                              np.random.choice([cv2.BORDER_REPLICATE, cv2.BORDER_CONSTANT]),
                              value=(np.random.randint(0, 256), np.random.randint(0, 256), np.random.randint(0, 256)))
     return img
-    
-    
+
+
 
 BOX_COLOR = (255, 0, 0) # Red
 TEXT_COLOR = (255, 255, 255) # White
