@@ -22,10 +22,10 @@ def profile_model(model):
 print(timm.list_models("*mobilenet*"))
 
 # timm_model = timm.create_model("mobilenetv3_large_100", pretrained=False, features_only=True)
-timm_model = timm.create_model('mobilenetv3_small_075.lamb_in1k', pretrained=True, features_only=True)
-print(timm_model.default_cfg)
-print(timm_model)
-profile_model(timm_model)
+# timm_model = timm.create_model('mobilenetv3_small_075.lamb_in1k', pretrained=True, features_only=True)
+# print(timm_model.default_cfg)
+# print(timm_model)
+# profile_model(timm_model)
 print("=====================================")
 
 config = get_config()

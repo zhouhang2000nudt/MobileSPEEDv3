@@ -20,34 +20,35 @@ self_supervised: false
 # =========================dataset=========================
 data_dir: ../datasets/speed     # 数据路径
 workers: 16            # dataloader workers
-ram: false            # 是否使用内存加载数据
+ram: true            # 是否使用内存加载数据
 imgsz: [480, 768]     # 图片大小 [480, 768]
 
 
 # ==========================model==========================
 pos_dim: 3                             # 位置维度
-stride: 5                            # 步长 度
-neighbour: 0                             # 邻居
-alpha: 0.1                            # 平滑因子
+stride: 5                             # 步长 度
+neighbour: 3                             # 邻居
+ratio: 0.1                            # 平滑因子
 pretrained: true
 deform_layers: []
-neck: FPNPAN                            # FPNPAN/BiFPN/AFPN
-expand_ratio: [1, 1, 1]                 # 扩张率
+neck: ShortBiFPN                            # FPNPAN/BiFPN/AFPN
+expand_ratio: [1.2, 1, 0.8]                 # 扩张率
 pool_size: [3, 2, 1]                # 池化尺寸
 
 # ==========================loss===========================
-ALPHA: [1, 5]                       # Score = ALPHA[0] * POS_Error + ALPHA[1] * Euler_Error
-BETA: [1.2, 8]                  # Loss = BETA[0] * POS_LOSS + BETA[1] * Euler_LOSS + BETA[2] * CLS_LOSS
+ALPHA: [1, 5]                       # Score = ALPHA[0] * Pos_Error + ALPHA[1] * Ori_Error
+BETA: [1.2, 8, 5]                  # Loss = BETA[0] * Pos_LOSS + BETA[1] * Euler_LOSS + BETA[2] * Ori_LOSS
 pos_loss: MSE                       # 位置损失函数 MAE/MSE/Huber/Log_Cosh (regression loss)
-euler_loss: CrossEntropy              # 姿态值损失函数 CrossEntropy/Focal
+euler_loss: JS_Divergence              # 欧拉角损失函数 CrossEntropy/Focal/JS_Divergence/KL_Divergence
+ori_loss: MSE                   # 姿态损失函数 MAE/MSE/Huber/Log_Cosh (regression loss)
 
 # ==========================train==========================
 optimizer: AdamW       # 优化器 Adam/SGD/AdamW
 lr0: 0.001            # 初始学习率
 momentum: 0.937       # 动量
 weight_decay: 0.01    # 权重衰减
-epoch: 200            # 训练轮数
-batch_size: 32        # 批次大小
+epoch: 300            # 训练轮数
+batch_size: 16        # 批次大小
 precision: mix        # 训练精度 half/mix/double/full/int8
 accumulate_grad_batches: 1            # 累计梯度批次
 lr_scheduler: WarmupCosineAnnealingLR # 学习率调度器 WarmupCosineAnnealingLR/ReduceLROnPlateau/MultiStepLR
@@ -68,8 +69,13 @@ milestones: [30, 60]  # 学习率衰减里程碑
 Rotate:
   Rotate_img: true
   Rotate_cam: true
-  img_angle: 60
+  img_angle: 90
   cam_angle: 10
-  p: 0.5             # p为图片旋转的概率，(1-p)为相机旋转的概率
+  p: 0.8             # p为图片旋转的概率，(1-p)为相机旋转的概率
 
-CropAndPadding: 0.5
+CropAndPadding:
+  p: 0.5
+
+DropBlockSafe:
+  p: 0.5
+  drop_num_lim: 3

@@ -43,9 +43,9 @@ class OriEncoderDecoder:
         self.yaw_len = int(360 // stride + 1 + 2 * neighbour)
         self.pitch_len = int(180 // stride + 1 + 2 * neighbour)
         self.roll_len = int(360 // stride + 1 + 2 * neighbour)
-        self.yaw_range = np.linspace(-neighbour * stride, 360 + neighbour * stride, self.yaw_len) - 180
-        self.pitch_range = np.linspace(-neighbour * stride, 180 + neighbour * stride, self.pitch_len) - 90
-        self.roll_range = np.linspace(-neighbour * stride, 360 + neighbour * stride, self.roll_len) - 180
+        self.yaw_range = torch.linspace(-neighbour * stride, 360 + neighbour * stride, self.yaw_len) - 180
+        self.pitch_range = torch.linspace(-neighbour * stride, 180 + neighbour * stride, self.pitch_len) - 90
+        self.roll_range = torch.linspace(-neighbour * stride, 360 + neighbour * stride, self.roll_len) - 180
         self.yaw_index_dict = {int(yaw // stride): i for i, yaw in enumerate(self.yaw_range)}
         self.pitch_index_dict = {int(pitch // stride): i for i, pitch in enumerate(self.pitch_range)}
         self.roll_index_dict = {int(roll // stride): i for i, roll in enumerate(self.roll_range)}
@@ -94,24 +94,43 @@ class OriEncoderDecoder:
         return yaw_encode, pitch_encode, roll_encode
 
     def decode_ori(self, yaw_encode: Tensor, pitch_encode: Tensor, roll_encode: Tensor):
-        yaw_decode = np.sum(yaw_encode * self.yaw_range)
-        pitch_decode = np.sum(pitch_encode * self.pitch_range)
-        roll_decode = np.sum(roll_encode * self.roll_range)
+        yaw_decode = torch.sum(yaw_encode * self.yaw_range)
+        pitch_decode = torch.sum(pitch_encode * self.pitch_range)
+        roll_decode = torch.sum(roll_encode * self.roll_range)
         
         rotation = R.from_euler('YXZ', [yaw_decode, pitch_decode, roll_decode], degrees=True)
         ori = rotation.as_quat()
         ori = [ori[3], ori[0], ori[1], ori[2]]
+        
         return torch.tensor(ori)
 
     def decode_ori_batch(self, yaw_encode: Tensor, pitch_encode: Tensor, roll_encode: Tensor):
-        ori_decode = []
-        for b in range:
-            ori_decode.append(self.decode_ori(yaw_encode[b], pitch_encode[b], roll_encode[b]))
+        # ori_decode = []
+        # for b in range:
+        #     ori_decode.append(self.decode_ori(yaw_encode[b], pitch_encode[b], roll_encode[b]))
         
-        return torch.tensor(ori_decode)
+        # return torch.tensor(ori_decode)
+        
+        yaw_decode = torch.sum(yaw_encode * self.yaw_range, dim=1)
+        pitch_decode = torch.sum(pitch_encode * self.pitch_range, dim=1)
+        roll_decode = torch.sum(roll_encode * self.roll_range, dim=1)
+        
+        cy = torch.cos(torch.deg2rad(yaw_decode * 0.5))
+        sy = torch.sin(torch.deg2rad(yaw_decode * 0.5))
+        cp = torch.cos(torch.deg2rad(pitch_decode * 0.5))
+        sp = torch.sin(torch.deg2rad(pitch_decode * 0.5))
+        cr = torch.cos(torch.deg2rad(roll_decode * 0.5))
+        sr = torch.sin(torch.deg2rad(roll_decode * 0.5))
+        
+        q0 = cy * cp * cr + sy * sp * sr
+        q1 = cy * sp * cr + sy * cp * sr
+        q2 = sy * cp * cr - cy * sp * sr
+        q3 = -sy * sp * cr + cy * cp * sr
+        
+        return torch.stack([q0, q1, q2, q3], dim=1)
 
 
-ori_encoder_decoder = OriEncoderDecoder(10, 0.5, 0)
+ori_encoder_decoder = OriEncoderDecoder(5, 0.1, 0)
 
 config = get_config()
 prepare_Speed(config)
@@ -125,8 +144,10 @@ yaw_encode = y["yaw_encode"]
 pitch_encode = y["pitch_encode"]
 roll_encode = y["roll_encode"]
 bbox = y["bbox"]
-ori_decode = ori_encoder_decoder.decode_ori(yaw_encode, pitch_encode, roll_encode)
+ori_decode = ori_encoder_decoder.decode_ori_batch(torch.tensor(yaw_encode).unsqueeze(0),
+                                                  torch.tensor(pitch_encode).unsqueeze(0),
+                                                  torch.tensor(roll_encode).unsqueeze(0))
 
 category_ids = [1]
 category_id_to_name = {1: 'satellite'}
-visualize(image, [bbox], category_ids, category_id_to_name, ori_decode, pos, Camera.K)
+visualize(image, [bbox], category_ids, category_id_to_name, ori_decode[0], pos, Camera.K)

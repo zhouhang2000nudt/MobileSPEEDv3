@@ -56,7 +56,7 @@ def DropBlockSafe(img: np.array, bbox: List[float], drop_num_lim: int):
             drop_y_min = np.random.randint(area_y_min, area_y_max+1)
             drop_x_max = np.random.randint(drop_x_min, area_x_max+1)
             drop_y_max = np.random.randint(drop_y_min, area_y_max+1)
-            img[drop_y_min:drop_y_max+1, drop_x_min:drop_x_max+1] = 128
+            img[:, drop_y_min:drop_y_max+1, drop_x_min:drop_x_max+1] = 128
         except:
             pass
     return img
@@ -126,12 +126,12 @@ def prepare_Speed(config: dict):
                               saturation=0.3,
                               hue=0.3,
                               p=0.5),
-                # A.RandomSunFlare(flare_roi=(0, 0, 1, 1),
-                #                  p=0.5),
+                A.RandomSunFlare(flare_roi=(0, 0, 1, 1),
+                                 p=0.5),
                 A.OneOf([
                     A.GaussNoise(p=0.5),
                     A.ISONoise(p=0.5)
-                ])
+                ], p=0.5),
             ],
             p=1,
             bbox_params=A.BboxParams(format="pascal_voc", label_fields=["category_ids"]))
@@ -239,7 +239,7 @@ def prepare_Speed(config: dict):
         Speed.read_img()
     
     # 设置姿态编码解码器
-    Speed.ori_encoder_decoder = OriEncoderDecoder(Speed.config["stride"], Speed.config["alpha"], Speed.config["neighbour"])
+    Speed.ori_encoder_decoder = OriEncoderDecoder(Speed.config["stride"], Speed.config["ratio"], Speed.config["neighbour"])
 
 
 class ImageReader(Thread):
@@ -252,7 +252,7 @@ class ImageReader(Thread):
     
     def run(self):
         for img_name in tqdm(self.image_name):
-            img = cv.imread(str(self.image_dir / img_name), cv.IMREAD_GRAYSCALE)
+            img = cv.imread(str(self.image_dir / img_name))
             self.img_dict[img_name] = img
     
     def get_result(self) -> dict:
@@ -292,7 +292,7 @@ class Speed(Dataset):
         if Speed.config["ram"]:
             image = Speed.img_dict[filename]
         else:
-            image = cv.imread(str(self.image_dir / filename), cv.IMREAD_GRAYSCALE)       # 读取图片
+            image = cv.imread(str(self.image_dir / filename))       # 读取图片
         
         ori = np.array(self.labels[filename]["ori"])   # 姿态
         pos = np.array(self.labels[filename]["pos"])   # 位置
@@ -367,14 +367,12 @@ class Speed(Dataset):
                 bbox = list(map(int, list(transformed["bboxes"][0])))
         
         if "self_supervised" in self.mode:
-            image_1 = self.transform(image_1)       # (1, 480, 768)
-            image_1 = image_1.repeat(3, 1, 1)       # (3, 480, 768)
-            image_2 = self.transform(image_2)       # (1, 480, 768)
-            image_2 = image_2.repeat(3, 1, 1)       # (3, 480, 768)
+            image_1 = self.transform(image_1)       # (3, 480, 768)
+            image_2 = self.transform(image_2)       # (3, 480, 768)
             return image_1, image_2
         
         # 使用torchvision转换图片
-        # image = self.transform(image)       # (1, 480, 768)
+        image = self.transform(image)       # (3, 480, 768)
         # image = image.repeat(3, 1, 1)       # (3, 480, 768)
         
         yaw_encode, pitch_encode, roll_encode = Speed.ori_encoder_decoder.encode_ori(ori)

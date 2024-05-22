@@ -4,7 +4,7 @@ import torch.nn as nn
 from typing import List, Union
 from torch import Tensor
 
-from .block import SPPF, FPNPAN, RepECPHead, Conv2dNormActivation, DCNv2
+from .block import SPPF, FPNPAN, RepECPHead, DCNv2, ShortBiFPN
 from torchvision.models import mobilenet_v3_large, MobileNet_V3_Large_Weights, mobilenet_v3_small, MobileNet_V3_Small_Weights
 
 class Mobile_SPEEDv3(nn.Module):
@@ -36,7 +36,11 @@ class Mobile_SPEEDv3(nn.Module):
         
         neck_in_channels = [40, 112, SPPF_out_channels]
         neck_out_channels = neck_in_channels
-        self.FPNPAN = FPNPAN(in_channels=neck_in_channels)
+        
+        if config["neck"] == "FPNPAN":
+            self.neck = FPNPAN(in_channels=neck_in_channels)
+        elif config["neck"] == "ShortBiFPN":
+            self.neck = ShortBiFPN(in_channels=neck_in_channels)
         
         self.RepECPHead = RepECPHead(in_channels=neck_out_channels, 
                                      expand_ratio=config["expand_ratio"],
@@ -53,7 +57,7 @@ class Mobile_SPEEDv3(nn.Module):
         
         p5 = self.SPPF(p5)
         
-        p3, p4, p5 = self.FPNPAN([p3, p4, p5])
+        p3, p4, p5 = self.neck([p3, p4, p5])
         
         pos, yaw, pitch, roll = self.RepECPHead([p3, p4, p5])
         return pos, yaw, pitch, roll

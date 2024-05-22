@@ -162,6 +162,54 @@ class FPNPAN(nn.Module):
         return p3_fused_up, p4_fused_down, p5_fused_down
 
 
+class ShortBiFPN(nn.Module):
+    def __init__(self, in_channels: List[int], fuse_mode: str = "cat"):
+        super(ShortBiFPN, self).__init__()
+        self.UpSample = nn.Upsample(scale_factor=2, mode="bilinear", align_corners=True)
+        self.fuse_mode = fuse_mode
+        
+        if fuse_mode == "cat":
+            fused_channel_p45 = in_channels[1] + in_channels[2]
+            fused_channel_p34 = in_channels[0] + in_channels[1]
+        elif fuse_mode == "add":
+            raise NotImplementedError("Not implemented yet")
+            pass
+        
+        self.p3_downconv_short = ConvBnAct(in_channels=in_channels[0], out_channels=in_channels[0], kernel_size=5, stride=4, padding=2)
+        
+        # 上采样通路
+        self.p4_fuseconv_up = RepVGGplusBlock(in_channels=fused_channel_p45, out_channels=in_channels[1], kernel_size=3, stride=1, padding=1)
+        self.p3_fuseconv_up = RepVGGplusBlock(in_channels=fused_channel_p34, out_channels=in_channels[0], kernel_size=3, stride=1, padding=1)
+        
+        # 下采样通路
+        self.p3_downconv_down = ConvBnAct(in_channels=in_channels[0], out_channels=in_channels[0], kernel_size=3, stride=2)
+        
+        self.p4_fuseconv_down = RepVGGplusBlock(in_channels=fused_channel_p34 + in_channels[1], out_channels=in_channels[1], kernel_size=3, stride=1, padding=1)
+        self.p4_downconv_down = ConvBnAct(in_channels=in_channels[1], out_channels=in_channels[1], kernel_size=3, stride=2)
+        
+        self.p5_fuseconv_down = RepVGGplusBlock(in_channels=fused_channel_p45 + in_channels[0], out_channels=in_channels[2], kernel_size=3, stride=1, padding=1)
+    
+    def forward(self, x):
+        p3, p4, p5 = x      # in: 40, 60, 96; p4: 112, 30, 48; p5: 160, 15, 24
+        
+        # 上采样通路
+        if self.fuse_mode == "cat":
+            p4_fused_up = self.p4_fuseconv_up(torch.cat([F.interpolate(p5, size=p4.shape[2:], mode="bilinear", align_corners=True), p4], dim=1)) # 112, 30, 48
+        
+        if self.fuse_mode == "cat":
+            p3_fused_up = self.p3_fuseconv_up(torch.cat([F.interpolate(p4_fused_up, size=p3.shape[2:], mode="bilinear", align_corners=True), p3], dim=1)) # 40, 60, 96    out
+        
+        # 下采样通路
+        if self.fuse_mode == "cat":
+            p4_fused_down = self.p4_fuseconv_down(torch.cat([self.p3_downconv_down(p3_fused_up), p4_fused_up, p4], dim=1)) # 112, 30, 48    out
+        
+        if self.fuse_mode == "cat":
+            p5_fused_down = self.p5_fuseconv_down(torch.cat([self.p4_downconv_down(p4_fused_down), p5, self.p3_downconv_short(p3)], dim=1)) # 160, 15, 24    out
+        
+        return p3_fused_up, p4_fused_down, p5_fused_down
+
+
+
 # ================== neck end ==================
 
 
