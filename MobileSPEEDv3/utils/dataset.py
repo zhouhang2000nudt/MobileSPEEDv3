@@ -107,7 +107,7 @@ def prepare_Speed(config: dict):
         "train": {
             "transform": v2.Compose([
                 v2.ToTensor(),
-                v2.Resize(size=config["imgsz"]),
+                # v2.Resize(size=config["imgsz"]),
             ]),
             "A_transform": A.Compose([
                 A.OneOf([
@@ -119,18 +119,18 @@ def prepare_Speed(config: dict):
                                  p=0.5),
                     A.GaussianBlur(blur_limit=(3, 7),
                                    p=0.5),
-                    ], p=0.2),
+                    ], p=0.3),
                 A.ColorJitter(brightness=0.3,
                               contrast=0.3,
                               saturation=0.3,
                               hue=0.3,
-                              p=0.2),
+                              p=0.3),
                 A.RandomSunFlare(flare_roi=(0, 0, 1, 1),
-                                 p=0),
+                                 p=0.3),
                 A.OneOf([
                     A.GaussNoise(p=0.5),
                     A.ISONoise(p=0.5)
-                ], p=0.2),
+                ], p=0.3),
             ],
             p=1,
             bbox_params=A.BboxParams(format="pascal_voc", label_fields=["category_ids"]))
@@ -139,21 +139,21 @@ def prepare_Speed(config: dict):
         "val": {
             "transform": v2.Compose([
                 v2.ToTensor(),
-                v2.Resize(size=config["imgsz"]),
+                # v2.Resize(size=config["imgsz"]),
             ]),
             "A_transform": None,
         },
         "test": {
             "transform": v2.Compose([
                 v2.ToTensor(),
-                v2.Resize(size=config["imgsz"]),
+                # v2.Resize(size=config["imgsz"]),
             ]),
             "A_transform": None,
         },
         "self_supervised_train": {
             "transform": v2.Compose([
                 v2.ToTensor(),
-                v2.Resize(size=config["imgsz"]),
+                # v2.Resize(size=config["imgsz"]),
             ]),
             "A_transform": A.Compose([
                 A.OneOf([
@@ -184,7 +184,7 @@ def prepare_Speed(config: dict):
         "self_supervised_val": {
             "transform": v2.Compose([
                 v2.ToTensor(),
-                v2.Resize(size=config["imgsz"]),
+                # v2.Resize(size=config["imgsz"]),
             ]),
             "A_transform": [A.Compose([
                 A.Flip(p=0.5),
