@@ -3,8 +3,6 @@ import time
 import os
 os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
 import torch
-from rich import print
-from functools import partial
 
 from MobileSPEEDv3.utils.config import get_config
 from MobileSPEEDv3.utils.dataset import SpeedDataModule, prepare_Speed
