@@ -78,4 +78,4 @@ CropAndPadding:
 
 DropBlockSafe:
   p: 0.5
-  drop_num_lim: 5
+  drop_num_lim: 3
