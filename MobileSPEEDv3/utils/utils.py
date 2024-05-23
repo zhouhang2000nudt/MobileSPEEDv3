@@ -26,14 +26,15 @@ from torch import Tensor
 class Camera:
     fwx = 0.0176  # focal length[m]
     fwy = 0.0176  # focal length[m]
-    width = 1920  # number of horizontal[pixels]
-    height = 1200  # number of vertical[pixels]
+    width = int(1920/2.5)  # number of horizontal[pixels]
+    height = int(1200/2.5)  # number of vertical[pixels]
     ppx = 5.86e-6  # horizontal pixel pitch[m / pixel]
     ppy = ppx  # vertical pixel pitch[m / pixel]
     fx = fwx / ppx  # horizontal focal length[pixels]
     fy = fwy / ppy  # vertical focal length[pixels]
 
     K = np.array([[fx, 0, width / 2], [0, fy, height / 2], [0, 0, 1]])
+    K_inv = np.linalg.inv(K)
 
 
 def wrap_boxes(boxes, M, width, height):
@@ -111,7 +112,7 @@ def clamp(bbox):
     return bbox
 
 
-def rotate_image(image, pos, ori, camera_k, rot_max_magnitude):
+def rotate_image(image, pos, ori, K, K_inv, rot_max_magnitude):
     """Data augmentation: rotate image and adapt position/orientation.
     Rotation amplitude is randomly picked from [-rot_max_magnitude/2, +rot_max_magnitude/2]
     """
@@ -126,7 +127,7 @@ def rotate_image(image, pos, ori, camera_k, rot_max_magnitude):
     
 
     # Construct warping (perspective) matrix
-    warp_matrix = camera_k @ r_change @ np.linalg.inv(camera_k)
+    warp_matrix = K @ r_change @ K_inv
 
     height, width = np.shape(image)[:2]
 
@@ -141,7 +142,7 @@ def rotate_image(image, pos, ori, camera_k, rot_max_magnitude):
     return image_warped, pos_new, ori_new, warp_matrix
 
 
-def rotate_cam(image, pos, ori, camera_k, rot_max_magnitude):
+def rotate_cam(image, pos, ori, K, K_inv, rot_max_magnitude):
     """Data augmentation: rotate image and adapt position/orientation.
     Rotation amplitude is randomly picked from [-rot_max_magnitude/2, +rot_max_magnitude/2]
     """
@@ -153,10 +154,9 @@ def rotate_cam(image, pos, ori, camera_k, rot_max_magnitude):
     # r_change = rpy2r(change, 0, 0, order='xyz', unit='deg')
     rotation = R.from_euler('YXZ', change, degrees=True)
     r_change = rotation.as_matrix()
-    
 
     # Construct warping (perspective) matrix
-    warp_matrix = camera_k @ r_change @ np.linalg.inv(camera_k)
+    warp_matrix = K @ r_change @ K_inv
 
     height, width = np.shape(image)[:2]
 

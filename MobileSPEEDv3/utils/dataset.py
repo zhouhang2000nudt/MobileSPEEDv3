@@ -306,6 +306,11 @@ class Speed(Dataset):
         if bbox[3] >= 1200:
             bbox[3] = 1199
         
+        transformed = self.Resize(image=image, bboxes=[bbox], category_ids=[1])
+        image = transformed["image"]
+        bbox = list(map(int, list(transformed["bboxes"][0])))
+        image = cv.cvtColor(image, cv.COLOR_GRAY2RGB)       # 转换为RGB格式
+        
         # 先进行wrapping
         dice = np.random.rand()
         if ("train" in self.mode or "self_supervised" in self.mode) and (Speed.config["Rotate"]["Rotate_img"] or Speed.config["Rotate"]["Rotate_cam"]):
@@ -318,8 +323,8 @@ class Speed(Dataset):
                         wrapped = False
                         break
                     wrapped_time += 1
-                    image_wrapped, pos_wrapped, ori_wrapped, M_wrapped = rotate_image(image, pos, ori, Speed.camera.K, Speed.config["Rotate"]["img_angle"])
-                    bbox_wrapped = wrap_boxes(np.array([bbox]), M_wrapped, height=1200, width=1920).tolist()[0]
+                    image_wrapped, pos_wrapped, ori_wrapped, M_wrapped = rotate_image(image, pos, ori, Speed.camera.K, Speed.camera.K_inv, Speed.config["Rotate"]["img_angle"])
+                    bbox_wrapped = wrap_boxes(np.array([bbox]), M_wrapped, height=Speed.config["imgsz"][0], width=Speed.config["imgsz"][1]).tolist()[0]
                     if bbox_in_image(bbox_wrapped, bbox_area):
                         wrapped = True
                         break
@@ -329,8 +334,8 @@ class Speed(Dataset):
                         wrapped = False
                         break
                     wrapped_time += 1
-                    image_wrapped, pos_wrapped, ori_wrapped, M_wrapped = rotate_cam(image, pos, ori, Speed.camera.K, Speed.config["Rotate"]["cam_angle"])
-                    bbox_wrapped = wrap_boxes(np.array([bbox]), M_wrapped, height=1200, width=1920).tolist()[0]
+                    image_wrapped, pos_wrapped, ori_wrapped, M_wrapped = rotate_cam(image, pos, ori, Speed.camera.K, Speed.camera.K_inv, Speed.config["Rotate"]["cam_angle"])
+                    bbox_wrapped = wrap_boxes(np.array([bbox]), M_wrapped, height=Speed.config["imgsz"][0], width=Speed.config["imgsz"][1]).tolist()[0]
                     if bbox_in_image(bbox_wrapped, bbox_area):
                         wrapped = True
                         break
@@ -340,11 +345,6 @@ class Speed(Dataset):
                 pos = pos_wrapped
                 ori = ori_wrapped
                 bbox = list(map(int, bbox_wrapped))
-        
-        transformed = self.Resize(image=image, bboxes=[bbox], category_ids=[1])
-        image = transformed["image"]
-        bbox = list(map(int, list(transformed["bboxes"][0])))
-        image = cv.cvtColor(image, cv.COLOR_GRAY2RGB)       # 转换为RGB格式
         
         # 进行Albumentation增强
         if "self_supervised" in self.mode:
