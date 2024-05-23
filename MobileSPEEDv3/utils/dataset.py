@@ -289,7 +289,7 @@ class Speed(Dataset):
         return len(self.sample_index)
 
     def __getitem__(self, index) -> tuple:
-        filename = self.sample_index[index].strip()                  # 图片文件名
+        filename = self.sample_index[index]                  # 图片文件名
         # filename = "img000001.jpg"
         if Speed.config["ram"]:
             image = Speed.img_dict[filename]
@@ -314,7 +314,7 @@ class Speed(Dataset):
             wrapped = False
             if Speed.config["Rotate"]["Rotate_img"] and dice <= Speed.config["Rotate"]["p"]:
                 while True:
-                    if wrapped_time > 10:
+                    if wrapped_time > 5:
                         wrapped = False
                         break
                     wrapped_time += 1
@@ -325,7 +325,7 @@ class Speed(Dataset):
                         break
             elif Speed.config["Rotate"]["Rotate_cam"] and dice > Speed.config["Rotate"]["p"]:
                 while True:
-                    if wrapped_time > 10:
+                    if wrapped_time > 5:
                         wrapped = False
                         break
                     wrapped_time += 1
@@ -445,7 +445,8 @@ class SpeedDataModule(L.LightningDataModule):
             batch_size=self.config["batch_size"],
             shuffle=True,
             num_workers=self.config["workers"],
-            persistent_workers=True
+            persistent_workers=True,
+            pin_memory=True
         )
     
     def val_dataloader(self) -> MultiEpochsDataLoader:
@@ -454,7 +455,8 @@ class SpeedDataModule(L.LightningDataModule):
             batch_size=self.config["batch_size"],
             shuffle=False,
             num_workers=self.config["workers"],
-            persistent_workers=True
+            persistent_workers=True,
+            pin_memory=True
         )
 
 
