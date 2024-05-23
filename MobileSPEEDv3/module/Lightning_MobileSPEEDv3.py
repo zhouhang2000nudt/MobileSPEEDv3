@@ -74,8 +74,8 @@ class LightningMobileSPEEDv3(L.LightningModule):
             train_yaw_loss = self.yaw_loss(yaw, labels["yaw_encode"])
             train_pitch_loss = self.pitch_loss(pitch, labels["pitch_encode"])
             train_roll_loss = self.roll_loss(roll, labels["roll_encode"])
-            ori = self.ori_encoder_decoder.decode_ori_batch(yaw, pitch, roll)
-            train_ori_loss = self.ori_loss(ori, labels["ori"])
+            ori_decode = self.ori_encoder_decoder.decode_ori_batch(yaw, pitch, roll)
+            train_ori_loss = self.ori_loss(ori_decode, labels["ori_decode"])
 
         train_loss = self.BETA[0] * train_pos_loss + self.BETA[1] * (train_yaw_loss + train_pitch_loss + train_roll_loss) + self.BETA[2] * train_ori_loss
 
@@ -125,7 +125,7 @@ class LightningMobileSPEEDv3(L.LightningModule):
             val_pitch_loss = self.pitch_loss(pitch, labels["pitch_encode"])
             val_roll_loss = self.roll_loss(roll, labels["roll_encode"])
             ori_decode = self.ori_encoder_decoder.decode_ori_batch(yaw, pitch, roll)
-            val_ori_loss = self.ori_loss(ori_decode, labels["ori"])
+            val_ori_loss = self.ori_loss(ori_decode, labels["ori_decode"])
             self.ori_error.update(ori_decode, labels["ori"])
             self.pos_error.update(pos, labels["pos"])
 

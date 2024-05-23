@@ -3,7 +3,6 @@ from torch.utils.data import Dataset, random_split, Subset
 from pathlib import Path
 from threading import Thread
 from tqdm import tqdm
-from numpy import ndarray
 from .utils import rotate_image, rotate_cam, Camera, wrap_boxes, bbox_in_image, OriEncoderDecoder
 from typing import List
 
@@ -26,7 +25,7 @@ def CropAndPad(img: np.array, bbox: List[float]):
     crop_y_min = np.random.randint(0, y_min+1)
     crop_x_max = np.random.randint(x_max, width)
     crop_y_max = np.random.randint(y_max, height)
-    img = img[crop_y_min:crop_y_max+1, crop_x_min:crop_x_max+1]
+    img = img[crop_y_min:crop_y_max+1, crop_x_min:crop_x_max+1, :]
     img = cv.copyMakeBorder(img, crop_y_min, 0, 0, 0, cv.BORDER_REPLICATE)
     img = cv.copyMakeBorder(img, 0, height-crop_y_max-1, 0, 0, cv.BORDER_REPLICATE)
     img = cv.copyMakeBorder(img, 0, 0, crop_x_min, 0, cv.BORDER_REPLICATE)
@@ -56,7 +55,7 @@ def DropBlockSafe(img: np.array, bbox: List[float], drop_num_lim: int):
             drop_y_min = np.random.randint(area_y_min, area_y_max+1)
             drop_x_max = np.random.randint(drop_x_min, area_x_max+1)
             drop_y_max = np.random.randint(drop_y_min, area_y_max+1)
-            img[:, drop_y_min:drop_y_max+1, drop_x_min:drop_x_max+1] = 128
+            img[drop_y_min:drop_y_max+1, drop_x_min:drop_x_max+1, :] = np.random.randint(100, 200)
         except:
             pass
     return img
@@ -126,11 +125,11 @@ def prepare_Speed(config: dict):
                               saturation=0.3,
                               hue=0.3,
                               p=0.2),
-                # A.RandomSunFlare(flare_roi=(0, 0, 1, 1),
-                #                  p=0),
+                A.RandomSunFlare(flare_roi=(0, 0, 1, 1),
+                                 p=0),
                 A.OneOf([
                     A.GaussNoise(p=0.5),
-                    # A.ISONoise(p=0.5)
+                    A.ISONoise(p=0.5)
                 ], p=0.2),
             ],
             p=1,
@@ -282,6 +281,9 @@ class Speed(Dataset):
         self.transform = Speed.transform[mode]["transform"]
         self.sample_index = Speed.train_index if "train" in mode else Speed.val_index if "val" in mode else Speed.test_index
         self.mode = mode
+        self.Resize = A.Compose([A.Resize(height=Speed.config["imgsz"][0], width=Speed.config["imgsz"][1], p=1.0)],
+        p=1,
+        bbox_params=A.BboxParams(format="pascal_voc", label_fields=["category_ids"]))
     
     def __len__(self):
         return len(self.sample_index)
@@ -339,6 +341,11 @@ class Speed(Dataset):
                 ori = ori_wrapped
                 bbox = list(map(int, bbox_wrapped))
         
+        transformed = self.Resize(image=image, bboxes=[bbox], category_ids=[1])
+        image = transformed["image"]
+        bbox = list(map(int, list(transformed["bboxes"][0])))
+        image = cv.cvtColor(image, cv.COLOR_GRAY2RGB)       # 转换为RGB格式
+        
         # 进行Albumentation增强
         if "self_supervised" in self.mode:
             # 空间变换
@@ -374,14 +381,18 @@ class Speed(Dataset):
         
         # 使用torchvision转换图片
         image = self.transform(image)       # (3, 480, 768)
-        image = image.repeat(3, 1, 1)       # (3, 480, 768)
+        # image = image.repeat(3, 1, 1)       # (3, 480, 768)
         
         yaw_encode, pitch_encode, roll_encode = Speed.ori_encoder_decoder.encode_ori(ori)
+        ori_decode = Speed.ori_encoder_decoder.decode_ori_batch(torch.tensor(yaw_encode).unsqueeze(0),
+                                                                torch.tensor(pitch_encode).unsqueeze(0),
+                                                                torch.tensor(roll_encode).unsqueeze(0))[0]
         
         y: dict = {
             "filename": filename,
             "pos": pos,
             "ori": ori,
+            "ori_decode": ori_decode,
             "yaw_encode": yaw_encode,
             "pitch_encode": pitch_encode,
             "roll_encode": roll_encode,

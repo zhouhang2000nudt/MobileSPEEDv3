@@ -37,7 +37,7 @@ pool_size: [3, 2, 1]                # 池化尺寸
 
 # ==========================loss===========================
 ALPHA: [1, 5]                       # Score = ALPHA[0] * Pos_Error + ALPHA[1] * Ori_Error
-BETA: [1.2, 8, 5]                  # Loss = BETA[0] * Pos_LOSS + BETA[1] * Euler_LOSS + BETA[2] * Ori_LOSS
+BETA: [1.2, 8, 3]                  # Loss = BETA[0] * Pos_LOSS + BETA[1] * Euler_LOSS + BETA[2] * Ori_LOSS
 pos_loss: MSE                       # 位置损失函数 MAE/MSE/Huber/Log_Cosh (regression loss)
 euler_loss: JS_Divergence              # 欧拉角损失函数 CrossEntropy/Focal/JS_Divergence/KL_Divergence
 ori_loss: MSE                   # 姿态损失函数 MAE/MSE/Huber/Log_Cosh (regression loss)
@@ -48,7 +48,7 @@ lr0: 0.001            # 初始学习率
 momentum: 0.937       # 动量
 weight_decay: 0.01    # 权重衰减
 epoch: 300            # 训练轮数
-batch_size: 16        # 批次大小
+batch_size: 60        # 批次大小
 precision: mix        # 训练精度 half/mix/double/full/int8
 accumulate_grad_batches: 1            # 累计梯度批次
 lr_scheduler: WarmupCosineAnnealingLR # 学习率调度器 WarmupCosineAnnealingLR/ReduceLROnPlateau/MultiStepLR
@@ -78,4 +78,4 @@ CropAndPadding:
 
 DropBlockSafe:
   p: 0.5
-  drop_num_lim: 3
+  drop_num_lim: 5

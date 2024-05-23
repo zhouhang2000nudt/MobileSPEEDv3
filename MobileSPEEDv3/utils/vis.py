@@ -98,9 +98,9 @@ def visualize_axes(ax, q, r, K, scale):
 
         # no pose label for test
         xa, ya = project(q, r, K)
-        ax.arrow(xa[0], ya[0], xa[1] - xa[0], ya[1] - ya[0], head_width=30, color='r')
-        ax.arrow(xa[0], ya[0], xa[2] - xa[0], ya[2] - ya[0], head_width=30, color='g')
-        ax.arrow(xa[0], ya[0], xa[3] - xa[0], ya[3] - ya[0], head_width=30, color='b')
+        ax.arrow(xa[0] / scale, ya[0] / scale, (xa[1] - xa[0]) / scale, (ya[1] - ya[0]) / scale, head_width=30 / scale, color='r')
+        ax.arrow(xa[0] / scale, ya[0] / scale, (xa[2] - xa[0]) / scale, (ya[2] - ya[0]) / scale, head_width=30 / scale, color='g')
+        ax.arrow(xa[0] / scale, ya[0] / scale, (xa[3] - xa[0]) / scale, (ya[3] - ya[0]) / scale, head_width=30 / scale, color='b')
 
         return
 
@@ -110,6 +110,7 @@ def visualize(image, bboxes, category_ids, category_id_to_name, ori, pos, K):
     bboxes[0][2] = int(bboxes[0][2])
     bboxes[0][3] = int(bboxes[0][3])
     img = image.copy()
+    scale = 1200 / image.shape[0]
     for bbox, category_id in zip(bboxes, category_ids):
         class_name = category_id_to_name[category_id]
         img = visualize_bbox(img, bbox, class_name)
@@ -117,6 +118,6 @@ def visualize(image, bboxes, category_ids, category_id_to_name, ori, pos, K):
     ax.set_xticks([])
     ax.set_yticks([])
     axis_length = 200
-    visualize_axes(ax, np.array(ori), np.array(pos), K, axis_length)
+    visualize_axes(ax, np.array(ori), np.array(pos), K, scale)
     ax.imshow(img, cmap='gray')
     plt.show()
