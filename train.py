@@ -50,6 +50,7 @@ if __name__ == "__main__":
                                  verbose=True,
                                  save_last=True,
                                  mode="min",
+                                 every_n_train_steps="10",
                                  save_weights_only=True)
     # 监控设备状态
     device_monitor = DeviceStatsMonitor(cpu_stats=None)

@@ -35,7 +35,7 @@ def CrossEntropy_Loss(pre: Tensor, label: Tensor):
 @torch.jit.script
 def JS_Divergence(pre: Tensor, label: Tensor):
     m = 0.5 * (pre + label)
-    return torch.mean(0.5 * (entropy(pre, m, eps2=1e-12) + entropy(label, m, eps1=0)))
+    return torch.mean(0.5 * (entropy(pre, m) + entropy(label, m, eps2=1e-12)))
 
 @torch.jit.script
 def KL_Divergence(pre: Tensor, label: Tensor):
