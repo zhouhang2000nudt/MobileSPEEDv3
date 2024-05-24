@@ -103,10 +103,14 @@ for i in range(len(speed)):
     image, y = speed[i]
     break
 print(y["filename"])
+print(image.shape)
 pos = y["pos"]
 ori = y["ori"]
 bbox = y["bbox"]
-image = cv2.resize(image, (1920, 1200))
+print("ori", ori)
+print("pos", pos)
+print("bbox", bbox)
+# image = cv2.resize(image, (1920, 1200))
 
 
 # speed = Speed("self_supervised_train")
@@ -141,4 +145,4 @@ image = cv2.resize(image, (1920, 1200))
 # image = np.array(image)
 
 
-visualize(image, [bbox], category_ids, category_id_to_name, ori, pos, Camera.K)
+visualize(image, [bbox], category_ids, category_id_to_name, ori, pos, Camera.K, scale=2.5)

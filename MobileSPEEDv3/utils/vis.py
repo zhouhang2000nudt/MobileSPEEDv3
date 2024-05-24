@@ -104,13 +104,12 @@ def visualize_axes(ax, q, r, K, scale):
 
         return
 
-def visualize(image, bboxes, category_ids, category_id_to_name, ori, pos, K):
+def visualize(image, bboxes, category_ids, category_id_to_name, ori, pos, K, scale):
     bboxes[0][0] = int(bboxes[0][0])
     bboxes[0][1] = int(bboxes[0][1])
     bboxes[0][2] = int(bboxes[0][2])
     bboxes[0][3] = int(bboxes[0][3])
     img = image.copy()
-    scale = 1200 / image.shape[0]
     for bbox, category_id in zip(bboxes, category_ids):
         class_name = category_id_to_name[category_id]
         img = visualize_bbox(img, bbox, class_name)

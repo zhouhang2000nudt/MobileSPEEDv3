@@ -283,15 +283,16 @@ class Speed(Dataset):
         self.transform = Speed.transform[mode]["transform"]
         self.sample_index = Speed.train_index if "train" in mode else Speed.val_index if "val" in mode else Speed.test_index
         self.mode = mode
-        # self.Resize = A.Compose([A.Resize(height=Speed.config["imgsz"][0], width=Speed.config["imgsz"][1], p=1.0)],
-        # p=1,
-        # bbox_params=A.BboxParams(format="pascal_voc", label_fields=["category_ids"]))
+        self.Resize = A.Compose([A.Resize(height=Speed.config["imgsz"][0], width=Speed.config["imgsz"][1], p=1.0)],
+        p=1,
+        bbox_params=A.BboxParams(format="pascal_voc", label_fields=["category_ids"]))
     
     def __len__(self):
         return len(self.sample_index)
 
     def __getitem__(self, index) -> tuple:
         filename = self.sample_index[index]                  # 图片文件名
+        # filename = "img000001.jpg"
         if Speed.config["ram"]:
             image = Speed.img_dict[filename]
         else:
@@ -305,6 +306,11 @@ class Speed(Dataset):
             bbox[2] = 1919
         if bbox[3] >= 1200:
             bbox[3] = 1199
+            
+        # Resize
+        transformed = self.Resize(image=image, bboxes=[bbox], category_ids=[1])
+        image = transformed["image"]
+        bbox = list(map(int, list(transformed["bboxes"][0])))
         
         # 先进行wrapping
         dice = np.random.rand()
@@ -319,7 +325,7 @@ class Speed(Dataset):
                         break
                     wrapped_time += 1
                     image_wrapped, pos_wrapped, ori_wrapped, M_wrapped = rotate_image(image, pos, ori, Speed.camera.K, Speed.camera.K_inv, Speed.config["Rotate"]["img_angle"])
-                    bbox_wrapped = wrap_boxes(np.array([bbox]), M_wrapped, height=1200, width=1920).tolist()[0]
+                    bbox_wrapped = wrap_boxes(np.array([bbox]), M_wrapped, height=image.shape[0], width=image.shape[1]).tolist()[0]
                     if bbox_in_image(bbox_wrapped, bbox_area):
                         wrapped = True
                         break
@@ -330,7 +336,7 @@ class Speed(Dataset):
                         break
                     wrapped_time += 1
                     image_wrapped, pos_wrapped, ori_wrapped, M_wrapped = rotate_cam(image, pos, ori, Speed.camera.K, Speed.camera.K_inv, Speed.config["Rotate"]["cam_angle"])
-                    bbox_wrapped = wrap_boxes(np.array([bbox]), M_wrapped, height=1200, width=1920).tolist()[0]
+                    bbox_wrapped = wrap_boxes(np.array([bbox]), M_wrapped, height=image.shape[0], width=image.shape[1]).tolist()[0]
                     if bbox_in_image(bbox_wrapped, bbox_area):
                         wrapped = True
                         break
@@ -341,9 +347,6 @@ class Speed(Dataset):
                 ori = ori_wrapped
                 bbox = list(map(int, bbox_wrapped))
         
-        # transformed = self.Resize(image=image, bboxes=[bbox], category_ids=[1])
-        # image = transformed["image"]
-        # bbox = list(map(int, list(transformed["bboxes"][0])))
         image = cv.cvtColor(image, cv.COLOR_GRAY2RGB)       # 转换为RGB格式
         
         # 进行Albumentation增强
@@ -380,9 +383,11 @@ class Speed(Dataset):
             return image_1, image_2
         
         # Resize
-        image = cv.resize(image, (Speed.config["imgsz"][1], Speed.config["imgsz"][0]), cv.INTER_LINEAR)     # (3, 480, 768)
+        # transformed = self.Resize(image=image, bboxes=[bbox], category_ids=[1])
+        # image = transformed["image"]
+        # bbox = list(map(int, list(transformed["bboxes"][0])))
         # 使用torchvision转换图片
-        image = self.transform(image)       # (3, 480, 768)
+        # image = self.transform(image)       # (3, 480, 768)
         
         yaw_encode, pitch_encode, roll_encode = Speed.ori_encoder_decoder.encode_ori(ori)
         ori_decode = Speed.ori_encoder_decoder.decode_ori_batch(torch.tensor(yaw_encode).unsqueeze(0),
