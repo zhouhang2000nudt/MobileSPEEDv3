@@ -26,8 +26,8 @@ from torch import Tensor
 class Camera:
     fwx = 0.0176  # focal length[m]
     fwy = 0.0176  # focal length[m]
-    width = int(1920/2.5)  # number of horizontal[pixels]
-    height = int(1200/2.5)  # number of vertical[pixels]
+    width = 1920  # number of horizontal[pixels]
+    height = 1200  # number of vertical[pixels]
     ppx = 5.86e-6  # horizontal pixel pitch[m / pixel]
     ppy = ppx  # vertical pixel pitch[m / pixel]
     fx = fwx / ppx  # horizontal focal length[pixels]
@@ -117,21 +117,18 @@ def rotate_image(image, pos, ori, K, K_inv, rot_max_magnitude):
     Rotation amplitude is randomly picked from [-rot_max_magnitude/2, +rot_max_magnitude/2]
     """
 
-    image = np.array(image)
-
     change = (np.random.rand(1)-0.5) * rot_max_magnitude
 
     # r_change = rpy2r(change, 0, 0, order='xyz', unit='deg')
     rotation = R.from_euler('YXZ', [0, 0, change[0]], degrees=True)
     r_change = rotation.as_matrix()
     
-
     # Construct warping (perspective) matrix
     warp_matrix = K @ r_change @ K_inv
 
     height, width = np.shape(image)[:2]
 
-    image_warped = cv2.warpPerspective(image, warp_matrix, (width, height), cv2.WARP_INVERSE_MAP)
+    image_warped = cv2.warpPerspective(image, warp_matrix, (width, height), cv2.WARP_INVERSE_MAP, flags=cv2.INTER_LINEAR)
 
     # Update pose
     pos_new = np.array(r_change @ pos)
@@ -147,8 +144,6 @@ def rotate_cam(image, pos, ori, K, K_inv, rot_max_magnitude):
     Rotation amplitude is randomly picked from [-rot_max_magnitude/2, +rot_max_magnitude/2]
     """
 
-    image = np.array(image)
-
     change = (np.random.rand(3)-0.5) * rot_max_magnitude
 
     # r_change = rpy2r(change, 0, 0, order='xyz', unit='deg')
@@ -160,7 +155,7 @@ def rotate_cam(image, pos, ori, K, K_inv, rot_max_magnitude):
 
     height, width = np.shape(image)[:2]
 
-    image_warped = cv2.warpPerspective(image, warp_matrix, (width, height), cv2.WARP_INVERSE_MAP)
+    image_warped = cv2.warpPerspective(image, warp_matrix, (width, height), cv2.WARP_INVERSE_MAP, flags=cv2.INTER_LINEAR)
 
     # Update pose
     pos_new = np.array(r_change @ pos)

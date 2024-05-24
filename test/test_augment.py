@@ -102,9 +102,11 @@ speed = Speed("train")
 for i in range(len(speed)):
     image, y = speed[i]
     break
+print(y["filename"])
 pos = y["pos"]
 ori = y["ori"]
 bbox = y["bbox"]
+image = cv2.resize(image, (1920, 1200))
 
 
 # speed = Speed("self_supervised_train")
