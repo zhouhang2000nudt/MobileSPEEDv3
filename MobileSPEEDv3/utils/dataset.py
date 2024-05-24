@@ -1,5 +1,5 @@
 from torchvision.transforms import v2
-from torch.utils.data import Dataset, random_split, Subset
+from torch.utils.data import Dataset, random_split, Subset, DataLoader
 from pathlib import Path
 from threading import Thread
 from tqdm import tqdm
@@ -61,7 +61,7 @@ def DropBlockSafe(img: np.array, bbox: List[float], drop_num_lim: int):
     return img
         
 
-class MultiEpochsDataLoader(torch.utils.data.DataLoader):
+class MultiEpochsDataLoader(DataLoader):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._DataLoader__initialized = False
@@ -440,24 +440,26 @@ class SpeedDataModule(L.LightningDataModule):
         elif stage == "validate":
             self.speed_data_val: Speed = Speed("val")
     
-    def train_dataloader(self) -> MultiEpochsDataLoader:
-        return MultiEpochsDataLoader(
+    def train_dataloader(self) -> DataLoader:
+        return DataLoader(
             self.speed_data_train,
             batch_size=self.config["batch_size"],
             shuffle=True,
             num_workers=self.config["workers"],
             persistent_workers=True,
-            pin_memory=True
+            pin_memory=True,
+            prefetch_factor=2
         )
     
-    def val_dataloader(self) -> MultiEpochsDataLoader:
-        return MultiEpochsDataLoader(
+    def val_dataloader(self) -> DataLoader:
+        return DataLoader(
             self.speed_data_val,
             batch_size=self.config["batch_size"],
             shuffle=False,
             num_workers=self.config["workers"],
             persistent_workers=True,
-            pin_memory=True
+            pin_memory=True,
+            prefetch_factor=2
         )
 
 
