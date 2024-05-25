@@ -26,14 +26,14 @@ imgsz: [480, 768]     # 图片大小 [480, 768]
 
 # ==========================model==========================
 pos_dim: 3                             # 位置维度
-stride: 5                             # 步长 度
-neighbour: 3                             # 邻居
-ratio: 0.1                            # 平滑因子
+stride: 1                             # 步长 度
+neighbour: 0                             # 邻居
+ratio: 0.0                            # 平滑因子
 pretrained: true
 deform_layers: []
 neck: FPNPAN                            # FPNPAN/BiFPN/AFPN
 expand_ratio: [1, 1, 1]                 # 扩张率
-pool_size: [3, 2, 1]                # 池化尺寸
+pool_size: [4, 2, 1]                # 池化尺寸
 
 # ==========================loss===========================
 ALPHA: [1, 5]                       # Score = ALPHA[0] * Pos_Error + ALPHA[1] * Ori_Error
