@@ -113,26 +113,26 @@ def prepare_Speed(config: dict):
                 A.OneOf([
                     A.AdvancedBlur(blur_limit=(3, 7),
                                    rotate_limit=25,
-                                   p=0.5),
+                                   p=0.2),
                     A.Blur(blur_limit=(3, 7), p=0.2),
                     A.GaussNoise(var_limit=(5, 15),
-                                 p=0.5),
+                                 p=0.2),
                     A.GaussianBlur(blur_limit=(3, 7),
-                                   p=0.5),
-                    ], p=0.1),
+                                   p=0.2),
+                    ], p=0.2),
                 A.ColorJitter(brightness=0.2,
                               contrast=0.2,
                               saturation=0.2,
                               hue=0.2,
-                              p=0.1),
+                              p=0.2),
                 # A.RandomSunFlare(flare_roi=(0, 0, 1, 1),
                 #                  num_flare_circles_lower=4,
                 #                  num_flare_circles_upper=7,
                 #                  p=0.1),
-                A.OneOf([
-                    A.GaussNoise(p=0.5),
-                    A.ISONoise(p=0.5)
-                ], p=0.1),
+                # A.OneOf([
+                #     A.GaussNoise(p=0.5),
+                #     A.ISONoise(p=0.5)
+                # ], p=0.2),
             ],
             p=1,
             bbox_params=A.BboxParams(format="pascal_voc", label_fields=["category_ids"]))
