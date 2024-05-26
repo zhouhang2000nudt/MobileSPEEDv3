@@ -1,5 +1,5 @@
 # =================global configuration====================
-name: group
+name: mobilenetv3large-10_0_0.0-60_10_0.8-0.5-0.0-0.2
 seed: 19520311
 split: [0.85, 0.15]     # train val
 bar: rich               # 进度条 rich/tqdm
