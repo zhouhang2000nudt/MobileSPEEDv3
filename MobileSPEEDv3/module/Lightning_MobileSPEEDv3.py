@@ -20,13 +20,13 @@ class LightningMobileSPEEDv3(L.LightningModule):
         # 模型
         self.model: Mobile_SPEEDv3 = Mobile_SPEEDv3(self.config)
         # 欧拉角编码解码器
-        self.ori_encoder_decoder: OriEncoderDecoder = OriEncoderDecoder(self.config["stride"], self.config["ratio"], neighbour=self.config["neighbour"], device="cuda" if config["accelerator"] == "gpu" else config["accelerator"])
+        self.ori_encoder_decoder: OriEncoderDecoder = OriEncoderDecoder(self.config["stride"], self.config["ratio"], neighbour=self.config["neighbor"], device="cuda" if config["accelerator"] == "gpu" else config["accelerator"])
         # 损失函数
         self.pos_loss: PoseLoss = PoseLoss(self.config["pos_loss"])
         self.yaw_loss: EulerLoss = EulerLoss(self.config["euler_loss"])
         self.pitch_loss: EulerLoss = EulerLoss(self.config["euler_loss"])
         self.roll_loss: EulerLoss = EulerLoss(self.config["euler_loss"])
-        self.ori_loss: OriLoss = OriLoss(self.config["ori_loss"])
+        # self.ori_loss: OriLoss = OriLoss(self.config["ori_loss"])
         # 损失比例
         self.BETA = self.config["BETA"]
         # 指标

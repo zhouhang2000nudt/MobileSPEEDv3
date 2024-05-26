@@ -240,7 +240,7 @@ def prepare_Speed(config: dict):
         Speed.read_img()
     
     # 设置姿态编码解码器
-    Speed.ori_encoder_decoder = OriEncoderDecoder(Speed.config["stride"], Speed.config["ratio"], Speed.config["neighbour"])
+    Speed.ori_encoder_decoder = OriEncoderDecoder(Speed.config["stride"], Speed.config["ratio"], Speed.config["neighbor"])
 
 
 class ImageReader(Thread):
@@ -387,7 +387,7 @@ class Speed(Dataset):
         # image = transformed["image"]
         # bbox = list(map(int, list(transformed["bboxes"][0])))
         # 使用torchvision转换图片
-        # image = self.transform(image)       # (3, 480, 768)
+        image = self.transform(image)       # (3, 480, 768)
         
         yaw_encode, pitch_encode, roll_encode = Speed.ori_encoder_decoder.encode_ori(ori)
         ori_decode = Speed.ori_encoder_decoder.decode_ori_batch(torch.tensor(yaw_encode).unsqueeze(0),
