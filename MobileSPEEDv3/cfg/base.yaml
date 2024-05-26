@@ -28,9 +28,9 @@ imgsz: [480, 768]     # 图片大小 [480, 768]
 backbone: mobilenet_v3_large            # mobilenet_v3_large/mobilenet_v3_small/efficientnet_b1
 SE: true
 pos_dim: 3                             # 位置维度
-stride: 5                             # 步长 度
-neighbor: 3                             # 邻居
-ratio: 0.1                            # 平滑因子
+stride: 10                             # 步长 度
+neighbor: 0                             # 邻居
+ratio: 0.0                            # 平滑因子
 pretrained: true
 deform_layers: []
 neck: SPAN                            # FPNPAN/BiFPN/AFPN/SFPN
