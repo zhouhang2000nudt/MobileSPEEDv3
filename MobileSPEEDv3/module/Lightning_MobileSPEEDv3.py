@@ -192,6 +192,7 @@ class LightningMobileSPEEDv3(L.LightningModule):
                 eps = 1e-8
             optimizer = AdamW(self.parameters(), lr=self.config["lr0"],
                              weight_decay=self.config["weight_decay"],
+                             betas=(0.5, 0.999),
                              eps=eps)
         elif self.config["optimizer"] == "SGD":
             optimizer = SGD(self.parameters(), lr=self.config["lr0"],
