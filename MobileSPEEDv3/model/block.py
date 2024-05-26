@@ -10,7 +10,8 @@ from torchvision.ops import Conv2dNormActivation
 from torchvision.models.mobilenetv3 import InvertedResidual, InvertedResidualConfig
 
 from timm.layers.conv_bn_act import ConvBnAct
-from timm.models._efficientnet_blocks import InvertedResidual
+
+from fightingcv_attention.attention.SEAttention import SEAttention
 
 def autopad(k, p=None, d=1):  # kernel, padding, dilation
     """Pad to 'same' shape outputs."""
@@ -120,7 +121,6 @@ class SPPF(nn.Module):
 class FPNPAN(nn.Module):
     def __init__(self, in_channels: List[int], fuse_mode: str = "cat"):
         super(FPNPAN, self).__init__()
-        self.UpSample = nn.Upsample(scale_factor=2, mode="bilinear", align_corners=True)
         self.fuse_mode = fuse_mode
         
         if fuse_mode == "cat":
@@ -208,7 +208,52 @@ class ShortBiFPN(nn.Module):
         
         return p3_fused_up, p4_fused_down, p5_fused_down
 
-
+class SFPN(nn.Module):
+    def __init__(self, in_channels: List[int], fuse_mode: str = "cat", SE: bool = False):
+        super(SFPN, self).__init__()
+        
+        if fuse_mode == "cat":
+            fused_channel_p45 = in_channels[1] + in_channels[2]
+            fused_channel_p34 = in_channels[0] + in_channels[1]
+        elif fuse_mode == "add":
+            raise NotImplementedError("Not implemented yet")
+            pass
+        
+        self.p4_fuseconv_pos = RepVGGplusBlock(in_channels=fused_channel_p45, out_channels=in_channels[1], kernel_size=3, stride=1, padding=1)
+        self.p4_fuseconv_ori = RepVGGplusBlock(in_channels=fused_channel_p45, out_channels=in_channels[1], kernel_size=3, stride=1, padding=1)
+        
+        self.p4_exchange_conv = RepVGGplusBlock(in_channels=2*in_channels[1], out_channels=2*in_channels[1], kernel_size=3, stride=1, padding=1)
+        if SE:
+            self.p4_SE = SEAttention(2*in_channels[1], reduction=8)
+        else:
+            self.p4_SE = nn.Identity()
+        
+        self.p3_fuseconv_pos = RepVGGplusBlock(in_channels=fused_channel_p34, out_channels=in_channels[0], kernel_size=3, stride=1, padding=1)
+        self.p3_fuseconv_ori = RepVGGplusBlock(in_channels=fused_channel_p34, out_channels=in_channels[0], kernel_size=3, stride=1, padding=1)
+        
+        self.p3_exchange_conv = RepVGGplusBlock(in_channels=2*in_channels[0], out_channels=2*in_channels[0], kernel_size=3, stride=1, padding=1)
+        if SE:
+            self.p3_SE = SEAttention(2*in_channels[0], reduction=8)
+        else:
+            self.p3_SE = nn.Identity()
+    
+    def forward(self, x):
+        p3, p4, p5_pos, p5_ori = x      # in: 40, 60, 96; p4: 112, 30, 48; p5: 160, 15, 24
+        
+        p4_fused_pos = self.p4_fuseconv_pos(torch.cat([F.interpolate(p5_pos, size=p4.shape[2:], mode="bilinear", align_corners=True), p4], dim=1)) # 112, 30, 48
+        p4_fused_ori = self.p4_fuseconv_ori(torch.cat([F.interpolate(p5_ori, size=p4.shape[2:], mode="bilinear", align_corners=True), p4], dim=1)) # 112, 30, 48
+        p4_fused = self.p4_exchange_conv(torch.cat([p4_fused_pos, p4_fused_ori], dim=1))
+        p4_se = self.p4_SE(p4_fused)
+        p4_pos, p4_ori = torch.chunk(p4_se, 2, dim=1)
+        
+        p3_fused_pos = self.p3_fuseconv_pos(torch.cat([F.interpolate(p4_pos, size=p3.shape[2:], mode="bilinear", align_corners=True), p3], dim=1)) # 40, 60, 96
+        p3_fused_ori = self.p3_fuseconv_ori(torch.cat([F.interpolate(p4_ori, size=p3.shape[2:], mode="bilinear", align_corners=True), p3], dim=1)) # 40, 60, 96
+        p3_fused = self.p3_exchange_conv(torch.cat([p3_fused_pos, p3_fused_ori], dim=1))
+        p3_se = self.p3_SE(p3_fused)
+        p3_pos, p3_ori = torch.chunk(p3_se, 2, dim=1)
+        
+        return [p3_pos, p4_pos, p5_pos], [p3_ori, p4_ori, p5_ori]
+        
 
 # ================== neck end ==================
 
@@ -268,6 +313,20 @@ class RSC(nn.Module):
         p3, p4, p5 = x
         return torch.cat([p3.reshape(p3.size(0), -1), p4.reshape(p4.size(0), -1), p5.reshape(p5.size(0), -1)], dim=1)
 
+
+class Head_single(nn.Module):
+    def __init__(self, in_features: int, dim: int, softmax: bool = False):
+        super(Head_single, self).__init__()
+        hid_features = int(in_features // 2)
+        self.fc = nn.Sequential(
+            nn.Linear(in_features, hid_features),
+            nn.Hardswish(inplace=True),
+            nn.Linear(hid_features, dim),
+        )
+        self.softmax = nn.Softmax(dim=1) if softmax else nn.Identity()
+    
+    def forward(self, x):
+        return self.softmax(self.fc(x))
 
 class Head(nn.Module):
     def __init__(self, in_features: int, pos_dim: int, yaw_dim: int, pitch_dim: int, roll_dim: int):

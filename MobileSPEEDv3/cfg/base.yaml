@@ -25,13 +25,15 @@ imgsz: [480, 768]     # 图片大小 [480, 768]
 
 
 # ==========================model==========================
+backbone: mobilenet_v3_large            # mobilenet_v3_large/mobilenet_v3_small/efficientnet_b1
+SE: False
 pos_dim: 3                             # 位置维度
-stride: 1                             # 步长 度
-neighbour: 0                             # 邻居
-ratio: 0.0                            # 平滑因子
+stride: 5                             # 步长 度
+neighbor: 3                             # 邻居
+ratio: 0.1                            # 平滑因子
 pretrained: true
 deform_layers: []
-neck: FPNPAN                            # FPNPAN/BiFPN/AFPN
+neck: SPAN                            # FPNPAN/BiFPN/AFPN/SFPN
 expand_ratio: [1, 1, 1]                 # 扩张率
 pool_size: [4, 2, 1]                # 池化尺寸
 
@@ -40,13 +42,13 @@ ALPHA: [1, 5]                       # Score = ALPHA[0] * Pos_Error + ALPHA[1] * 
 BETA: [1.2, 8, 0]                  # Loss = BETA[0] * Pos_LOSS + BETA[1] * Euler_LOSS + BETA[2] * Ori_LOSS
 pos_loss: MSE                       # 位置损失函数 MAE/MSE/Huber/Log_Cosh (regression loss)
 euler_loss: CrossEntropy              # 欧拉角损失函数 CrossEntropy/Focal/JS_Divergence/KL_Divergence
-ori_loss: MSE                   # 姿态损失函数 MAE/MSE/Huber/Log_Cosh (regression loss)
+# ori_loss: MSE                   # 姿态损失函数 MAE/MSE/Huber/Log_Cosh (regression loss)
 
 # ==========================train==========================
 optimizer: AdamW       # 优化器 Adam/SGD/AdamW
-lr0: 0.001            # 初始学习率
+lr0: 0.0003             # 初始学习率
 momentum: 0.937       # 动量
-weight_decay: 0.01    # 权重衰减
+weight_decay: 0.0001    # 权重衰减
 epoch: 250            # 训练轮数
 batch_size: 30        # 批次大小
 precision: mix        # 训练精度 half/mix/double/full/int8
@@ -55,7 +57,7 @@ lr_scheduler: WarmupCosineAnnealingLR # 学习率调度器 WarmupCosineAnnealing
 
 # WarmupCosineAnnealingLR 参数
 warmup_epochs: 5      # warmup轮数
-lr_min: 0.00001        # 最小学习率
+lr_min: 0.000003        # 最小学习率
 
 # ReduceLROnPlateau 参数
 factor: 0.1           # 学习率衰减因子
@@ -77,5 +79,5 @@ CropAndPadding:
   p: 0.5
 
 DropBlockSafe:
-  p: 0.1
+  p: 0.0
   drop_num_lim: 3

@@ -34,13 +34,13 @@ class LightningMobileSPEEDv3(L.LightningModule):
         self.train_yaw_loss: Loss = Loss()
         self.train_pitch_loss: Loss = Loss()
         self.train_roll_loss: Loss = Loss()
-        self.train_ori_loss: Loss = Loss()
+        # self.train_ori_loss: Loss = Loss()
         self.train_loss: Loss = Loss()
         self.val_pos_loss: Loss = Loss()
         self.val_yaw_loss: Loss = Loss()
         self.val_pitch_loss: Loss = Loss()
         self.val_roll_loss: Loss = Loss()
-        self.val_ori_loss: Loss = Loss()
+        # self.val_ori_loss: Loss = Loss()
         self.val_loss: Loss = Loss()
         self.ori_error: OriError = OriError()
         self.pos_error: PosError = PosError()
@@ -107,7 +107,7 @@ class LightningMobileSPEEDv3(L.LightningModule):
 
     # ===========================validation===========================
     def on_validation_start(self) -> None:
-        rich.print(f"[b]{'train':<5} Epoch {self.current_epoch:>3}/{self.trainer.max_epochs:<3} pos_loss: {self.train_pos_loss.compute().item():<8.4f}  yaw_loss: {self.train_yaw_loss.compute().item():<8.4f}  pitch_loss: {self.train_pitch_loss.compute().item():<8.4f}  roll_loss: {self.train_roll_loss.compute().item():<8.4f}  ori_loss: {self.train_ori_loss.compute().item():<8.4f}  loss: {self.train_loss.compute().item():<8.4f}")
+        rich.print(f"[b]{'train':<5} Epoch {self.current_epoch:>3}/{self.trainer.max_epochs:<3} pos_loss: {self.train_pos_loss.compute().item():<8.4f}  yaw_loss: {self.train_yaw_loss.compute().item():<8.4f}  pitch_loss: {self.train_pitch_loss.compute().item():<8.4f}  roll_loss: {self.train_roll_loss.compute().item():<8.4f}  loss: {self.train_loss.compute().item():<8.4f}")
     
     def validation_step(self, batch, batch_index):
         # 取出数据
@@ -168,7 +168,7 @@ class LightningMobileSPEEDv3(L.LightningModule):
             "val/score": self.score.compute(),
         }
         self.log_dict(self.metric_dict, on_epoch=True)
-        rich.print(f"[b]{'val':<5} Epoch {self.current_epoch:>3}/{self.trainer.max_epochs:<3} pos_loss: {self.val_pos_loss.compute().item():<8.4f}  yaw_loss: {self.val_yaw_loss.compute().item():<8.4f}  pitch_loss: {self.val_pitch_loss.compute().item():<8.4f}  roll_loss: {self.val_roll_loss.compute().item():<8.4f}  ori_loss: {self.val_ori_loss.compute().item():<8.4f}  loss: {self.val_loss.compute().item():<8.4f}  pos_error(m): {self.pos_error.compute().item():<8.4f}  ori_error(deg): {self.ori_error.compute().item():<8.4f}")
+        rich.print(f"[b]{'val':<5} Epoch {self.current_epoch:>3}/{self.trainer.max_epochs:<3} pos_loss: {self.val_pos_loss.compute().item():<8.4f}  yaw_loss: {self.val_yaw_loss.compute().item():<8.4f}  pitch_loss: {self.val_pitch_loss.compute().item():<8.4f}  roll_loss: {self.val_roll_loss.compute().item():<8.4f}  loss: {self.val_loss.compute().item():<8.4f}  pos_error(m): {self.pos_error.compute().item():<8.4f}  ori_error(deg): {self.ori_error.compute().item():<8.4f}")
         self.val_pos_loss.reset()
         self.val_yaw_loss.reset()
         self.val_pitch_loss.reset()
