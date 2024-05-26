@@ -34,7 +34,5 @@ print(full_model)
 full_model.eval()
 full_model.switch_repvggplus_to_deploy()
 print(full_model)
-# for stage in full_model.features:
-#     t = stage(t)
-#     print(t.shape)
+print(full_model(t).shape)
 profile_model(full_model)
