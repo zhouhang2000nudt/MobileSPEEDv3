@@ -5,8 +5,8 @@ from torch import Tensor
 from functools import partial
 
 @torch.jit.script
-def entropy(p: Tensor, q: Tensor, eps1: float = 0, eps2: float = 0):
-    return torch.sum(p * torch.log(p / (q+eps1) + eps2), dim=1)
+def entropy(pre: Tensor, label: Tensor, eps1: float = 0, eps2: float = 0):
+    return torch.sum(label * torch.log(label / (pre+eps1) + eps2), dim=1)
 
 # 回归损失函数
 @torch.jit.script
@@ -35,11 +35,11 @@ def CrossEntropy_Loss(pre: Tensor, label: Tensor):
 @torch.jit.script
 def JS_Divergence(pre: Tensor, label: Tensor):
     m = 0.5 * (pre + label)
-    return torch.mean(0.5 * (entropy(pre, m) + entropy(label, m, eps2=1e-12)))
+    return torch.mean(0.5 * (entropy(pre, m, eps2=1e-12) + entropy(label, m, eps1=1e-12)))
 
 @torch.jit.script
 def KL_Divergence(pre: Tensor, label: Tensor):
-    return torch.mean(entropy(pre, label, eps1=1e-12, eps2=1e-12))
+    return torch.mean(entropy(pre, label, eps2=1e-12))
 
 @torch.jit.script
 def Focal_Loss(pre: Tensor, label: Tensor, gamma: float = 2.0, alpha: float = 0.25):

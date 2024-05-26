@@ -26,7 +26,7 @@ imgsz: [480, 768]     # 图片大小 [480, 768]
 
 # ==========================model==========================
 backbone: mobilenet_v3_large            # mobilenet_v3_large/mobilenet_v3_small/efficientnet_b1
-SE: False
+SE: true
 pos_dim: 3                             # 位置维度
 stride: 5                             # 步长 度
 neighbor: 3                             # 邻居
@@ -39,7 +39,7 @@ pool_size: [4, 2, 1]                # 池化尺寸
 
 # ==========================loss===========================
 ALPHA: [1, 5]                       # Score = ALPHA[0] * Pos_Error + ALPHA[1] * Ori_Error
-BETA: [1.2, 8, 0]                  # Loss = BETA[0] * Pos_LOSS + BETA[1] * Euler_LOSS + BETA[2] * Ori_LOSS
+BETA: [1, 10, 0]                    # Loss = BETA[0] * Pos_LOSS + BETA[1] * Euler_LOSS + BETA[2] * Ori_LOSS
 pos_loss: MSE                       # 位置损失函数 MAE/MSE/Huber/Log_Cosh (regression loss)
 euler_loss: CrossEntropy              # 欧拉角损失函数 CrossEntropy/Focal/JS_Divergence/KL_Divergence
 # ori_loss: MSE                   # 姿态损失函数 MAE/MSE/Huber/Log_Cosh (regression loss)
@@ -48,8 +48,8 @@ euler_loss: CrossEntropy              # 欧拉角损失函数 CrossEntropy/Focal
 optimizer: AdamW       # 优化器 Adam/SGD/AdamW
 lr0: 0.0003             # 初始学习率
 momentum: 0.937       # 动量
-weight_decay: 0.0001    # 权重衰减
-epoch: 250            # 训练轮数
+weight_decay: 0.01    # 权重衰减
+epoch: 200            # 训练轮数
 batch_size: 30        # 批次大小
 precision: mix        # 训练精度 half/mix/double/full/int8
 accumulate_grad_batches: 1            # 累计梯度批次

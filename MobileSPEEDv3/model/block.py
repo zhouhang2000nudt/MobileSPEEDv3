@@ -222,7 +222,7 @@ class SFPN(nn.Module):
         self.p4_fuseconv_pos = RepVGGplusBlock(in_channels=fused_channel_p45, out_channels=in_channels[1], kernel_size=3, stride=1, padding=1)
         self.p4_fuseconv_ori = RepVGGplusBlock(in_channels=fused_channel_p45, out_channels=in_channels[1], kernel_size=3, stride=1, padding=1)
         
-        self.p4_exchange_conv = RepVGGplusBlock(in_channels=2*in_channels[1], out_channels=2*in_channels[1], kernel_size=3, stride=1, padding=1)
+        # self.p4_exchange_conv = RepVGGplusBlock(in_channels=2*in_channels[1], out_channels=2*in_channels[1], kernel_size=3, stride=1, padding=1)
         if SE:
             self.p4_SE = SEAttention(2*in_channels[1], reduction=8)
         else:
@@ -231,7 +231,7 @@ class SFPN(nn.Module):
         self.p3_fuseconv_pos = RepVGGplusBlock(in_channels=fused_channel_p34, out_channels=in_channels[0], kernel_size=3, stride=1, padding=1)
         self.p3_fuseconv_ori = RepVGGplusBlock(in_channels=fused_channel_p34, out_channels=in_channels[0], kernel_size=3, stride=1, padding=1)
         
-        self.p3_exchange_conv = RepVGGplusBlock(in_channels=2*in_channels[0], out_channels=2*in_channels[0], kernel_size=3, stride=1, padding=1)
+        # self.p3_exchange_conv = RepVGGplusBlock(in_channels=2*in_channels[0], out_channels=2*in_channels[0], kernel_size=3, stride=1, padding=1)
         if SE:
             self.p3_SE = SEAttention(2*in_channels[0], reduction=8)
         else:
@@ -242,13 +242,15 @@ class SFPN(nn.Module):
         
         p4_fused_pos = self.p4_fuseconv_pos(torch.cat([F.interpolate(p5_pos, size=p4.shape[2:], mode="bilinear", align_corners=True), p4], dim=1)) # 112, 30, 48
         p4_fused_ori = self.p4_fuseconv_ori(torch.cat([F.interpolate(p5_ori, size=p4.shape[2:], mode="bilinear", align_corners=True), p4], dim=1)) # 112, 30, 48
-        p4_fused = self.p4_exchange_conv(torch.cat([p4_fused_pos, p4_fused_ori], dim=1))
+        # p4_fused = self.p4_exchange_conv(torch.cat([p4_fused_pos, p4_fused_ori], dim=1))
+        p4_fused = torch.cat([p4_fused_pos, p4_fused_ori], dim=1)
         p4_se = self.p4_SE(p4_fused)
         p4_pos, p4_ori = torch.chunk(p4_se, 2, dim=1)
         
         p3_fused_pos = self.p3_fuseconv_pos(torch.cat([F.interpolate(p4_pos, size=p3.shape[2:], mode="bilinear", align_corners=True), p3], dim=1)) # 40, 60, 96
         p3_fused_ori = self.p3_fuseconv_ori(torch.cat([F.interpolate(p4_ori, size=p3.shape[2:], mode="bilinear", align_corners=True), p3], dim=1)) # 40, 60, 96
-        p3_fused = self.p3_exchange_conv(torch.cat([p3_fused_pos, p3_fused_ori], dim=1))
+        # p3_fused = self.p3_exchange_conv(torch.cat([p3_fused_pos, p3_fused_ori], dim=1))
+        p3_fused = torch.cat([p3_fused_pos, p3_fused_ori], dim=1)
         p3_se = self.p3_SE(p3_fused)
         p3_pos, p3_ori = torch.chunk(p3_se, 2, dim=1)
         
