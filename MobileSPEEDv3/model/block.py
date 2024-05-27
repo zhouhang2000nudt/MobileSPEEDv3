@@ -208,6 +208,18 @@ class ShortBiFPN(nn.Module):
         
         return p3_fused_up, p4_fused_down, p5_fused_down
 
+
+class Align(nn.Module):
+    def __init__(self, in_channels: List[int], out_channels: List[int]):
+        super(Align, self).__init__()
+        self.p3_align = ConvBnAct(in_channels=in_channels[0], out_channels=out_channels[0], kernel_size=3, stride=1, padding=1)
+        self.p4_align = ConvBnAct(in_channels=in_channels[1], out_channels=out_channels[1], kernel_size=3, stride=1, padding=1)
+        self.p5_align = ConvBnAct(in_channels=in_channels[2], out_channels=out_channels[2], kernel_size=3, stride=1, padding=1)
+    
+    def forward(self, x):
+        p3, p4, p5 = x
+        return self.p3_align(p3), self.p4_align(p4), self.p5_align(p5)
+
 class SFPN(nn.Module):
     def __init__(self, in_channels: List[int], fuse_mode: str = "cat", SE: bool = False):
         super(SFPN, self).__init__()
@@ -219,42 +231,61 @@ class SFPN(nn.Module):
             raise NotImplementedError("Not implemented yet")
             pass
         
-        self.p4_fuseconv_pos = RepVGGplusBlock(in_channels=fused_channel_p45, out_channels=in_channels[1], kernel_size=3, stride=1, padding=1)
-        self.p4_fuseconv_ori = RepVGGplusBlock(in_channels=fused_channel_p45, out_channels=in_channels[1], kernel_size=3, stride=1, padding=1)
+        self.p4_fuseconv_pos_up = RepVGGplusBlock(in_channels=fused_channel_p45, out_channels=in_channels[1], kernel_size=3, stride=1, padding=1)
+        self.p4_fuseconv_ori_up = RepVGGplusBlock(in_channels=fused_channel_p45, out_channels=in_channels[1], kernel_size=3, stride=1, padding=1)
         
-        # self.p4_exchange_conv = RepVGGplusBlock(in_channels=2*in_channels[1], out_channels=2*in_channels[1], kernel_size=3, stride=1, padding=1)
+        self.p4_exchange_conv = ConvBnAct(in_channels=2*in_channels[1], out_channels=2*in_channels[1], kernel_size=1, stride=1)
         if SE:
             self.p4_SE = SEAttention(2*in_channels[1], reduction=8)
         else:
             self.p4_SE = nn.Identity()
         
-        self.p3_fuseconv_pos = RepVGGplusBlock(in_channels=fused_channel_p34, out_channels=in_channels[0], kernel_size=3, stride=1, padding=1)
-        self.p3_fuseconv_ori = RepVGGplusBlock(in_channels=fused_channel_p34, out_channels=in_channels[0], kernel_size=3, stride=1, padding=1)
+        self.p3_fuseconv_pos_up = RepVGGplusBlock(in_channels=fused_channel_p34, out_channels=in_channels[0], kernel_size=3, stride=1, padding=1)
+        self.p3_fuseconv_ori_up = RepVGGplusBlock(in_channels=fused_channel_p34, out_channels=in_channels[0], kernel_size=3, stride=1, padding=1)
         
-        # self.p3_exchange_conv = RepVGGplusBlock(in_channels=2*in_channels[0], out_channels=2*in_channels[0], kernel_size=3, stride=1, padding=1)
+        self.p3_exchange_conv = ConvBnAct(in_channels=2*in_channels[0], out_channels=2*in_channels[0], kernel_size=1, stride=1)
         if SE:
             self.p3_SE = SEAttention(2*in_channels[0], reduction=8)
         else:
             self.p3_SE = nn.Identity()
+
+        self.p3_downconv_pos_down = ConvBnAct(in_channels=in_channels[0], out_channels=in_channels[0], kernel_size=3, stride=2)
+        self.p3_downconv_ori_down = ConvBnAct(in_channels=in_channels[0], out_channels=in_channels[0], kernel_size=3, stride=2)
+        
+        self.p4_fuseconv_pos_down = RepVGGplusBlock(in_channels=fused_channel_p34, out_channels=in_channels[1], kernel_size=3, stride=1, padding=1)        
+        self.p4_fuseconv_ori_down = RepVGGplusBlock(in_channels=fused_channel_p34, out_channels=in_channels[1], kernel_size=3, stride=1, padding=1)
+        self.p4_downconv_pos_down = ConvBnAct(in_channels=in_channels[1], out_channels=in_channels[1], kernel_size=3, stride=2)
+        self.p4_downconv_ori_down = ConvBnAct(in_channels=in_channels[1], out_channels=in_channels[1], kernel_size=3, stride=2)
+        
+        self.p5_fuseconv_pos_down = RepVGGplusBlock(in_channels=fused_channel_p45, out_channels=in_channels[2], kernel_size=3, stride=1, padding=1)
+        self.p5_fuseconv_ori_down = RepVGGplusBlock(in_channels=fused_channel_p45, out_channels=in_channels[2], kernel_size=3, stride=1, padding=1)
+        
+        
     
     def forward(self, x):
         p3, p4, p5_pos, p5_ori = x      # in: 40, 60, 96; p4: 112, 30, 48; p5: 160, 15, 24
         
-        p4_fused_pos = self.p4_fuseconv_pos(torch.cat([F.interpolate(p5_pos, size=p4.shape[2:], mode="bilinear", align_corners=True), p4], dim=1)) # 112, 30, 48
-        p4_fused_ori = self.p4_fuseconv_ori(torch.cat([F.interpolate(p5_ori, size=p4.shape[2:], mode="bilinear", align_corners=True), p4], dim=1)) # 112, 30, 48
-        # p4_fused = self.p4_exchange_conv(torch.cat([p4_fused_pos, p4_fused_ori], dim=1))
-        p4_fused = torch.cat([p4_fused_pos, p4_fused_ori], dim=1)
-        p4_se = self.p4_SE(p4_fused)
-        p4_pos, p4_ori = torch.chunk(p4_se, 2, dim=1)
+        p4_fused_pos_up = self.p4_fuseconv_pos_up(torch.cat([F.interpolate(p5_pos, size=p4.shape[2:], mode="bilinear", align_corners=True), p4], dim=1)) # 112, 30, 48
+        p4_fused_ori_up = self.p4_fuseconv_ori_up(torch.cat([F.interpolate(p5_ori, size=p4.shape[2:], mode="bilinear", align_corners=True), p4], dim=1)) # 112, 30, 48
+        p4_fused_up = torch.cat([p4_fused_pos_up, p4_fused_ori_up], dim=1)
+        p4_fused_up = self.p4_exchange_conv(p4_fused_up)
+        p4_se = self.p4_SE(p4_fused_up)
+        p4_pos_up, p4_ori_up = torch.chunk(p4_se, 2, dim=1)
         
-        p3_fused_pos = self.p3_fuseconv_pos(torch.cat([F.interpolate(p4_pos, size=p3.shape[2:], mode="bilinear", align_corners=True), p3], dim=1)) # 40, 60, 96
-        p3_fused_ori = self.p3_fuseconv_ori(torch.cat([F.interpolate(p4_ori, size=p3.shape[2:], mode="bilinear", align_corners=True), p3], dim=1)) # 40, 60, 96
-        # p3_fused = self.p3_exchange_conv(torch.cat([p3_fused_pos, p3_fused_ori], dim=1))
-        p3_fused = torch.cat([p3_fused_pos, p3_fused_ori], dim=1)
-        p3_se = self.p3_SE(p3_fused)
-        p3_pos, p3_ori = torch.chunk(p3_se, 2, dim=1)
+        p3_fused_pos_up = self.p3_fuseconv_pos_up(torch.cat([F.interpolate(p4_pos_up, size=p3.shape[2:], mode="bilinear", align_corners=True), p3], dim=1)) # 40, 60, 96
+        p3_fused_ori_up = self.p3_fuseconv_ori_up(torch.cat([F.interpolate(p4_ori_up, size=p3.shape[2:], mode="bilinear", align_corners=True), p3], dim=1)) # 40, 60, 96
+        p3_fused_up = torch.cat([p3_fused_pos_up, p3_fused_ori_up], dim=1)
+        p3_fused_up = self.p3_exchange_conv(p3_fused_up)
+        p3_se = self.p3_SE(p3_fused_up)
+        p3_pos_up, p3_ori_up = torch.chunk(p3_se, 2, dim=1)
         
-        return [p3_pos, p4_pos, p5_pos], [p3_ori, p4_ori, p5_ori]
+        p4_fused_pos_down = self.p4_fuseconv_pos_down(torch.cat([self.p3_downconv_pos_down(p3_pos_up), p4_pos_up], dim=1))
+        p4_fused_ori_down = self.p4_fuseconv_ori_down(torch.cat([self.p3_downconv_ori_down(p3_ori_up), p4_ori_up], dim=1))
+        
+        p5_fused_pos_down = self.p5_fuseconv_pos_down(torch.cat([self.p4_downconv_pos_down(p4_fused_pos_down), p5_pos], dim=1))
+        p5_fused_ori_down = self.p5_fuseconv_ori_down(torch.cat([self.p4_downconv_ori_down(p4_fused_ori_down), p5_ori], dim=1))
+        
+        return [p3_pos_up, p4_fused_pos_down, p5_fused_pos_down], [p3_ori_up, p4_fused_ori_down, p5_fused_ori_down]
         
 
 # ================== neck end ==================
@@ -319,11 +350,8 @@ class RSC(nn.Module):
 class Head_single(nn.Module):
     def __init__(self, in_features: int, dim: int, softmax: bool = False):
         super(Head_single, self).__init__()
-        hid_features = int(in_features // 2)
         self.fc = nn.Sequential(
-            nn.Linear(in_features, hid_features),
-            nn.Hardswish(inplace=True),
-            nn.Linear(hid_features, dim),
+            nn.Linear(in_features, dim),
         )
         self.softmax = nn.Softmax(dim=1) if softmax else nn.Identity()
     

@@ -4,7 +4,7 @@ import torch.nn as nn
 from typing import List, Union
 from torch import Tensor
 
-from .block import SPPF, FPNPAN, RepECPHead, DCNv2, ShortBiFPN, SFPN, Head_single, ECP, RSC
+from .block import SPPF, FPNPAN, RepECPHead, DCNv2, ShortBiFPN, SFPN, Head_single, ECP, RSC, Align
 from torchvision.models import mobilenet_v3_large, MobileNet_V3_Large_Weights, mobilenet_v3_small, MobileNet_V3_Small_Weights
 from torchvision.models import efficientnet_b1, EfficientNet_B1_Weights
 from torchvision.models import regnet_y_1_6gf, RegNet_Y_1_6GF_Weights
@@ -42,16 +42,18 @@ class Mobile_SPEEDv3(nn.Module):
                              out_channels=SPPF_out_channels)
         self.SPPF_ori = SPPF(in_channels=SPPF_in_channels,
                              out_channels=SPPF_out_channels)
-        
+                
         if config["backbone"] == "mobilenet_v3_large":
             neck_in_channels = [40, 112, SPPF_out_channels]
         elif config["backbone"] == "mobilenet_v3_small":
             pass
         elif config["backbone"] == "efficientnet_b1":
             neck_in_channels = [112, 192, SPPF_out_channels]
-        neck_out_channels = neck_in_channels
+        neck_out_channels = [40, 80, 160]
         
-        self.neck = SFPN(in_channels=neck_in_channels, fuse_mode="cat", SE=config["SE"])
+        self.chennel_align = Align(in_channels=neck_in_channels, out_channels=neck_out_channels)
+        
+        self.neck = SFPN(in_channels=neck_out_channels, fuse_mode="cat", SE=config["SE"])
         
         self.ECP_pos = ECP(in_channels=neck_out_channels, expand_ratio=config["expand_ratio"], pool_size=config["pool_size"])
         self.ECP_ori = ECP(in_channels=neck_out_channels, expand_ratio=config["expand_ratio"], pool_size=config["pool_size"])
@@ -79,6 +81,8 @@ class Mobile_SPEEDv3(nn.Module):
         p3 = self.features[:7](x)
         p4 = self.features[7:13](p3)
         p5 = self.features[13:](p4)
+        
+        p3, p4, p5 = self.chennel_align([p3, p4, p5])
         
         p5_pos = self.SPPF_pos(p5)
         p5_ori = self.SPPF_ori(p5)
