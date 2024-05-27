@@ -70,10 +70,14 @@ milestones: [30, 60]  # 学习率衰减里程碑
 # ==========================Augmentation===================
 Rotate:
   Rotate_img: true
-  Rotate_cam: true
+  Rotate_cam: false
   img_angle: 60
   cam_angle: 10
-  p: 0.8             # p为图片旋转的概率，(1-p)为相机旋转的概率
+  p: 1.0             # p为图片旋转的概率，(1-p)为相机旋转的概率
+
+Translate:
+  p: 0.0
+  translate: 0.5
 
 CropAndPadding:
   p: 0.2

@@ -167,7 +167,25 @@ def rotate_cam(image, pos, ori, K, K_inv, rot_max_magnitude):
 
     return image_warped, pos_new, ori_new, warp_matrix
 
-
+def translate(image, pos, ori, K, trans_max_magnitude):
+    # 随机平移
+    changex = (np.random.rand()-0.5) * trans_max_magnitude
+    changey = (np.random.rand()-0.5) * trans_max_magnitude
+    changex = 0.2
+    changey = 0.0
+    
+    trans_mat = K @ np.array([changex, changey, 0])
+    trans_mat = np.array([[1, 0, trans_mat[0]],
+                          [0, 1, trans_mat[1]],
+                          [0, 0, 1]])
+    
+    height, width = np.shape(image)[:2]
+    image_transed = cv2.warpPerspective(image, trans_mat, (width, height), cv2.WARP_INVERSE_MAP, flags=cv2.INTER_LINEAR)
+    
+    pos_new = pos + np.array([changex, changey, 0])
+    ori_new = ori
+    
+    return image_transed, pos_new, ori_new, trans_mat
 
 class OriEncoderDecoder:
     def __init__(self, stride: int, alpha: float, neighbour: int = 0, device: str = 'cpu'):

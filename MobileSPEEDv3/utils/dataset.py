@@ -3,7 +3,7 @@ from torch.utils.data import Dataset, random_split, Subset, DataLoader
 from pathlib import Path
 from threading import Thread
 from tqdm import tqdm
-from .utils import rotate_image, rotate_cam, Camera, wrap_boxes, bbox_in_image, OriEncoderDecoder
+from .utils import rotate_image, rotate_cam, translate, Camera, wrap_boxes, bbox_in_image, OriEncoderDecoder
 from typing import List
 
 import albumentations as A
@@ -292,7 +292,7 @@ class Speed(Dataset):
 
     def __getitem__(self, index) -> tuple:
         filename = self.sample_index[index]                  # 图片文件名
-        # filename = "img000001.jpg"
+        # filename = "img007976.jpg"
         if Speed.config["ram"]:
             image = Speed.img_dict[filename]
         else:
@@ -347,6 +347,30 @@ class Speed(Dataset):
                 ori = ori_wrapped
                 bbox = list(map(int, bbox_wrapped))
         
+        # 进行平移
+        dice = np.random.rand()
+        if ("train" in self.mode or "self_supervised" in self.mode) and (Speed.config["Translate"]):
+            trans_time = 0
+            bbox_area = (bbox[2] - bbox[0]) * (bbox[3] - bbox[1])
+            transed = False
+            if dice < Speed.config["Translate"]["p"]:
+                while True:
+                    if trans_time > 5:
+                        transed = False
+                        break
+                    trans_time += 1
+                    image_transed, pos_transed, ori_transed, M_transed = translate(image, pos, ori, Speed.camera.K, Speed.config["Translate"]["translate"])
+                    bbox_transed = wrap_boxes(np.array([bbox]), M_transed, height=image.shape[0], width=image.shape[1]).tolist()[0]
+                    if bbox_in_image(bbox_transed, bbox_area):
+                        transed = True
+                        break
+            
+            if transed:
+                image = image_transed
+                pos = pos_transed
+                ori = ori_transed
+                bbox = list(map(int, bbox_transed))
+                    
         image = cv.cvtColor(image, cv.COLOR_GRAY2RGB)       # 转换为RGB格式
         
         # 进行Albumentation增强
