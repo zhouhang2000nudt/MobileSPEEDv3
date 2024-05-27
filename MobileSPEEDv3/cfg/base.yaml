@@ -18,8 +18,8 @@ self_supervised: false
 
 # =========================dataset=========================
 data_dir: ../datasets/speed     # 数据路径
-workers: 16            # dataloader workers
-ram: true            # 是否使用内存加载数据
+workers: 8            # dataloader workers
+ram: false            # 是否使用内存加载数据
 imgsz: [480, 768]     # 图片大小 [480, 768]
 
 
@@ -40,7 +40,7 @@ pool_size: [4, 2, 1]                # 池化尺寸
 ALPHA: [1, 5]                       # Score = ALPHA[0] * Pos_Error + ALPHA[1] * Ori_Error
 BETA: [1, 9, 0]                    # Loss = BETA[0] * Pos_LOSS + BETA[1] * Euler_LOSS + BETA[2] * Ori_LOSS
 pos_loss: MSE                       # 位置损失函数 MAE/MSE/Huber/Log_Cosh (regression loss)
-euler_loss: KL_Divergence              # 欧拉角损失函数 CrossEntropy/Focal/JS_Divergence/KL_Divergence
+euler_loss: CrossEntropy_Loss              # 欧拉角损失函数 CrossEntropy/Focal/JS_Divergence/KL_Divergence
 # ori_loss: MSE                   # 姿态损失函数 MAE/MSE/Huber/Log_Cosh (regression loss)
 
 # ==========================train==========================
@@ -49,7 +49,7 @@ lr0: 0.0005             # 初始学习率
 momentum: 0.937       # 动量
 weight_decay: 0.01    # 权重衰减
 epoch: 200            # 训练轮数
-batch_size: 30        # 批次大小
+batch_size: 15        # 批次大小
 precision: mix        # 训练精度 half/mix/double/full/int8
 accumulate_grad_batches: 1            # 累计梯度批次
 lr_scheduler: WarmupCosineAnnealingLR # 学习率调度器 WarmupCosineAnnealingLR/ReduceLROnPlateau/MultiStepLR
