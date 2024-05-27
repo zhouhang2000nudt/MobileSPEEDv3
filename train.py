@@ -3,6 +3,7 @@ import time
 import os
 os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
 import torch
+import argparse
 
 from MobileSPEEDv3.utils.config import get_config
 from MobileSPEEDv3.utils.dataset import SpeedDataModule, prepare_Speed
@@ -19,17 +20,48 @@ from lightning.pytorch.loggers import CometLogger
 from lightning.pytorch.profilers import SimpleProfiler
 
 
-if __name__ == "__main__":
-    torch.set_float32_matmul_precision("high")
 
+if __name__ == "__main__":
+    
+    parser = argparse.ArgumentParser()
+    
+    parser.add_argument("--backbone", type=str, default="mobilenet_v3_large", help="backbone")
+    parser.add_argument("--stride", type=int, default=10, help="stride")
+    parser.add_argument("--neighbor", type=int, default=3, help="neighbor")
+    parser.add_argument("--ratio", type=float, default=0.1, help="ratio")
+    parser.add_argument("--img_angle", type=float, default=60, help="img_angle")
+    parser.add_argument("--cam_angle", type=float, default=10, help="cam_angle")
+    parser.add_argument("--Rotatep", type=float, default=0.8, help="Rotatep")
+    parser.add_argument("--CropAndPadp", type=float, default=0.2, help="CropAndPadp")
+    parser.add_argument("--DropBlockSafep", type=float, default=0.2, help="DropBlockp")
+    parser.add_argument("--Augmentationp", type=float, default=0.2, help="augmentp")
+    
+    args = parser.parse_args()
     # ====================配置====================
     config = get_config()
+    
+    config["backbone"] = args.backbone
+    config["stride"] = args.stride
+    config["neighbor"] = args.neighbor
+    config["ratio"] = args.ratio
+    config["Rotate"]["img_angle"] = args.img_angle
+    config["Rotate"]["cam_angle"] = args.cam_angle
+    config["Rotate"]["p"] = args.Rotatep
+    config["CropAndPad"]["p"] = args.CropAndPadp
+    config["DropBlockSafe"]["p"] = args.DropBlockSafep
+    config["Augmentation"]["p"] = args.Augmentationp
+    
+    config["name"] = f"{config['backbone']}-{config['stride']}_{config['neighbor']}_{config['ratio']}-{config['Rotate']['img_angle']}_{config['Rotate']['cam_angle']}_{config['Rotate']['p']}-{config['CropAndPad']['p']}-{config['DropBlockSafe']['p']}-{config['Augmentation']['p']}"
+    
+    torch.set_float32_matmul_precision("high")
+    
     dirpath = f"./result/{config['name']}-{time.strftime('%Y-%m-%d %H-%M-%S', time.localtime())}"
     # 判断是否存在路径 若不存在则创建
     if not os.path.exists(dirpath):
         os.makedirs(dirpath)
+    
     # 设置随机种子
-    seed_everything(config["seed"], workers=True)
+    # seed_everything(config["seed"])
 
 
     # ===================训练器===================
@@ -122,74 +154,3 @@ if __name__ == "__main__":
     if config["val"]:
         module = LightningMobileSPEEDv3.load_from_checkpoint(module.trainer.callbacks[3].best_model_path)
         trainer.validate(model=module, datamodule=dataloader)
-    
-    # ====================剪枝====================
-    # if config["pruning"]:
-    #     module = LightningMobileSPEEDNet(config)
-    #     module.model.load_state_dict(torch.load("BiFPN-GIoU-best.pt"))
-    #     example_inputs = torch.randn(1, 3, 240, 384).to(module.device)
-    #     iterative_steps = 1
-    #     all_layer = list(module.model.modules())
-        
-    #     if config["pruning_method"] == "slim":
-    #         imp = tp.importance.BNScaleImportance()
-    #         pruner_entry = partial(tp.pruner.BNScalePruner, global_pruning=False)
-    #     elif config["pruning_method"] == "l1":
-    #         imp = tp.importance.MagnitudeImportance(p=1)
-    #         pruner_entry = partial(tp.pruner.MagnitudePruner, global_pruning=False)
-    #     elif config["pruning_method"] == "group":
-    #         imp = tp.importance.GroupNormImportance(p=2)
-    #         pruner_entry = partial(tp.pruner.GroupNormPruner, global_pruning=False)
-    #     elif config["pruning_method"] == "grow":
-    #         imp = tp.importance.GroupNormImportance(p=2)
-    #         pruner_entry = partial(tp.pruner.GrowingRegPruner, global_pruning=False)
-        
-    #     pruner = pruner_entry(
-    #             module,
-    #             example_inputs,
-    #             importance=imp,
-    #             iterative_steps=iterative_steps,
-    #             pruning_ratio=0.5,
-    #             pruning_ratio_dict={},
-    #             ignored_layers=all_layer[218:],
-    #             unwrapped_parameters=[]
-    #         )
-        
-    #     module.eval()
-    #     original_ops, original_size = tp.utils.count_ops_and_params(module, example_inputs)
-    #     trainer.validate(model=module, datamodule=dataloader)
-    #     print("Pruning...")
-    #     for i in range(iterative_steps):
-    #         pruner.step()
-    #         pruned_ops, pruned_size = tp.utils.count_ops_and_params(module, example_inputs)
-    #         print(
-    #             "Iter %d/%d, Params: {:.2f} M => {:.2f} M ({:.2f}%)".format(
-    #             original_size / 1e6, pruned_size / 1e6, pruned_size / original_size * 100)
-    #         )
-    #         print(
-    #             "FLOPs: {:.2f} M => {:.2f} M ({:.2f}%, {:.2f}X )".format(
-    #             original_ops / 1e6,
-    #             pruned_ops / 1e6,
-    #             pruned_ops / original_ops * 100,
-    #             original_ops / pruned_ops,
-    #             )
-    #         )
-    #         module.eval()
-    #         trainer.validate(model=module, datamodule=dataloader)
-    #         print("========================================================")
-    #     trainer = Trainer(accelerator=config["accelerator"],        # 加速器
-    #                   logger=comet_logger,
-    #                   callbacks=callbacks,
-    #                   max_epochs=config["epoch"],
-    #                   limit_train_batches=limit_train_batches,
-    #                   limit_val_batches=limit_val_batches,
-    #                   accumulate_grad_batches=config["accumulate_grad_batches"],
-    #                   deterministic=config["deterministic"],
-    #                   benchmark=config["benchmark"],
-    #                 #   profiler=profiler,
-    #                   plugins=plugins,
-    #                 #   precision=precision,
-    #                   default_root_dir=dirpath,
-    #                   num_sanity_val_steps=0)
-    #     trainer.fit(module, dataloader)
-    # # git clone https://a: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@github.com/zhouhang2000nudt/Mobile-SPEEDNet.git

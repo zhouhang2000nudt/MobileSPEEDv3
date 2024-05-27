@@ -119,20 +119,20 @@ def prepare_Speed(config: dict):
                                  p=0.2),
                     A.GaussianBlur(blur_limit=(3, 7),
                                    p=0.2),
-                    ], p=0.2),
+                    ], p=config["Augmentation"]["p"]),
                 A.ColorJitter(brightness=0.2,
                               contrast=0.2,
                               saturation=0.2,
                               hue=0.2,
-                              p=0.2),
+                              p=config["Augmentation"]["p"]),
                 # A.RandomSunFlare(flare_roi=(0, 0, 1, 1),
                 #                  num_flare_circles_lower=4,
                 #                  num_flare_circles_upper=7,
-                #                  p=0.1),
+                #                  p=config["Augmentation"]["p"]),
                 # A.OneOf([
                 #     A.GaussNoise(p=0.5),
                 #     A.ISONoise(p=0.5)
-                # ], p=0.2),
+                # ], p=config["Augmentation"]["p"]),
             ],
             p=1,
             bbox_params=A.BboxParams(format="pascal_voc", label_fields=["category_ids"]))
@@ -393,7 +393,7 @@ class Speed(Dataset):
                 transformed = self.A_transform(image=image, bboxes=[bbox], category_ids=[1])
                 image = transformed["image"]
                 dice = np.random.rand()
-                if dice < Speed.config["CropAndPadding"]["p"]:
+                if dice < Speed.config["CropAndPad"]["p"]:
                     image = CropAndPad(image, bbox)
                 dice = np.random.rand()
                 if dice < Speed.config["DropBlockSafe"]["p"]:

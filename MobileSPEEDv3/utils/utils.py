@@ -174,6 +174,16 @@ def translate(image, pos, ori, K, trans_max_magnitude):
     changex = 0.2
     changey = 0.0
     
+    point = [0, 0, 0, 1]
+    r_origin = np.array([[1, 0, 0, pos[0]],
+                          [0, 1, 0, pos[1]],
+                          [0, 0, 1, pos[2]],
+                          [0, 0, 0, 1]])
+    r_new = np.array([[1, 0, 0, pos[0] + changex],
+                      [0, 1, 0, pos[1] + changey],
+                      [0, 0, 1, pos[2]],
+                      [0, 0, 0, 1]])
+    
     trans_mat = K @ np.array([changex, changey, 0])
     trans_mat = np.array([[1, 0, trans_mat[0]],
                           [0, 1, trans_mat[1]],

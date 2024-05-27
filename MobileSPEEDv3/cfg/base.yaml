@@ -1,6 +1,5 @@
 # =================global configuration====================
 name: mobilenetv3large-10_0_0.0-60_10_0.8-0.2-0.2-0.2
-seed: 19520311
 split: [0.85, 0.15]     # train val
 bar: rich               # 进度条 rich/tqdm
 accelerator: gpu        # 训练设备 cpu/gpu
@@ -39,7 +38,7 @@ pool_size: [4, 2, 1]                # 池化尺寸
 
 # ==========================loss===========================
 ALPHA: [1, 5]                       # Score = ALPHA[0] * Pos_Error + ALPHA[1] * Ori_Error
-BETA: [1, 10, 0]                    # Loss = BETA[0] * Pos_LOSS + BETA[1] * Euler_LOSS + BETA[2] * Ori_LOSS
+BETA: [1, 9, 0]                    # Loss = BETA[0] * Pos_LOSS + BETA[1] * Euler_LOSS + BETA[2] * Ori_LOSS
 pos_loss: MSE                       # 位置损失函数 MAE/MSE/Huber/Log_Cosh (regression loss)
 euler_loss: KL_Divergence              # 欧拉角损失函数 CrossEntropy/Focal/JS_Divergence/KL_Divergence
 # ori_loss: MSE                   # 姿态损失函数 MAE/MSE/Huber/Log_Cosh (regression loss)
@@ -68,18 +67,21 @@ gamma: 0.1            # 学习率衰减因子
 milestones: [30, 60]  # 学习率衰减里程碑
 
 # ==========================Augmentation===================
+Augmentation:
+  p: 0.2
+
 Rotate:
   Rotate_img: true
-  Rotate_cam: false
+  Rotate_cam: true
   img_angle: 60
   cam_angle: 10
-  p: 1.0             # p为图片旋转的概率，(1-p)为相机旋转的概率
+  p: 0.8             # p为图片旋转的概率，(1-p)为相机旋转的概率
 
 Translate:
-  p: 0.0
+  p: 1.0
   translate: 0.5
 
-CropAndPadding:
+CropAndPad:
   p: 0.2
 
 DropBlockSafe:
