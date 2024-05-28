@@ -20,7 +20,7 @@ self_supervised: false
 data_dir: ../datasets/speed     # 数据路径
 workers: 20            # dataloader workers
 ram: true            # 是否使用内存加载数据
-imgsz: [480, 768]     # 图片大小 [480, 768]
+imgsz: [240, 384]     # 图片大小 [480, 768]
 
 
 # ==========================model==========================
@@ -30,7 +30,7 @@ SE: true
 pos_dim: 3                             # 位置维度
 stride: 5                             # 步长 度
 neighbor: 5                             # 邻居
-ratio: 0.0                            # 平滑因子
+ratio: 0.1                            # 平滑因子
 pretrained: true
 deform_layers: []
 neck: SPAN                            # FPNPAN/BiFPN/AFPN/SFPN
@@ -73,17 +73,17 @@ Augmentation:
 
 Rotate:
   Rotate_img: true
-  Rotate_cam: true
+  Rotate_cam: false
   img_angle: 60
   cam_angle: 10
-  p: 0.8             # p为图片旋转的概率，(1-p)为相机旋转的概率
+  p: 1.0             # p为图片旋转的概率，(1-p)为相机旋转的概率
 
 Translate:
-  p: 1.0
+  p: 0.0
   translate: 0.5
 
 CropAndPad:
-  p: 0.2
+  p: 0.5
 
 DropBlockSafe:
   p: 0.2

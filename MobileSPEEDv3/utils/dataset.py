@@ -111,19 +111,17 @@ def prepare_Speed(config: dict):
             ]),
             "A_transform": A.Compose([
                 A.OneOf([
-                    A.AdvancedBlur(blur_limit=(3, 7),
+                    A.AdvancedBlur(blur_limit=(3, 5),
                                    rotate_limit=25,
                                    p=0.2),
-                    A.Blur(blur_limit=(3, 7), p=0.2),
-                    A.GaussNoise(var_limit=(5, 15),
-                                 p=0.2),
-                    A.GaussianBlur(blur_limit=(3, 7),
+                    A.Blur(blur_limit=(3, 5), p=0.2),
+                    A.GaussianBlur(blur_limit=(3, 5),
                                    p=0.2),
                     ], p=config["Augmentation"]["p"]),
-                A.ColorJitter(brightness=0.2,
-                              contrast=0.2,
-                              saturation=0.2,
-                              hue=0.2,
+                A.ColorJitter(brightness=0.1,
+                              contrast=0.1,
+                              saturation=0.1,
+                              hue=0.1,
                               p=config["Augmentation"]["p"]),
                 # A.RandomSunFlare(flare_roi=(0, 0, 1, 1),
                 #                  num_flare_circles_lower=4,
@@ -159,10 +157,10 @@ def prepare_Speed(config: dict):
             ]),
             "A_transform": A.Compose([
                 A.OneOf([
-                    A.AdvancedBlur(blur_limit=(3, 7),
+                    A.AdvancedBlur(blur_limit=(3, 5),
                                    rotate_limit=25,
                                    p=0.2),
-                    A.Blur(blur_limit=(3, 7), p=0.2),
+                    A.Blur(blur_limit=(3, 5), p=0.2),
                     A.GaussNoise(var_limit=(5, 15),
                                  p=0.2),
                     A.GaussianBlur(blur_limit=(3, 7),
@@ -292,7 +290,7 @@ class Speed(Dataset):
 
     def __getitem__(self, index) -> tuple:
         filename = self.sample_index[index]                  # 图片文件名
-        # filename = "img007976.jpg"
+        # filename = "img001879.jpg"
         if Speed.config["ram"]:
             image = Speed.img_dict[filename]
         else:
@@ -411,7 +409,7 @@ class Speed(Dataset):
         # image = transformed["image"]
         # bbox = list(map(int, list(transformed["bboxes"][0])))
         # 使用torchvision转换图片
-        image = self.transform(image)       # (3, 480, 768)
+        # image = self.transform(image)       # (3, 480, 768)
         
         yaw_encode, pitch_encode, roll_encode = Speed.ori_encoder_decoder.encode_ori(ori)
         ori_decode = Speed.ori_encoder_decoder.decode_ori_batch(torch.tensor(yaw_encode).unsqueeze(0),

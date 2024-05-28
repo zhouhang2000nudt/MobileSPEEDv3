@@ -117,6 +117,8 @@ def visualize(image, bboxes, category_ids, category_id_to_name, ori, pos, K, sca
     ax.set_xticks([])
     ax.set_yticks([])
     axis_length = 200
+    K[0, 2] = K[0, 2] * scale
+    K[1, 2] = K[1, 2] * scale
     visualize_axes(ax, np.array(ori), np.array(pos), K, scale)
     ax.imshow(img, cmap='gray')
     plt.show()

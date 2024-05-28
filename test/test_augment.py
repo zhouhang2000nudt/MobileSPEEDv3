@@ -99,6 +99,7 @@ bbox = [539, 222, 1036, 700]
 
 
 config = get_config()
+config["ram"] = False
 prepare_Speed(config)
 speed = Speed("train")
 for i in range(len(speed)):
@@ -147,4 +148,4 @@ print("bbox", bbox)
 # image = np.array(image)
 
 
-visualize(image, [bbox], category_ids, category_id_to_name, ori, pos, Camera.K, scale=1)
+visualize(image, [bbox], category_ids, category_id_to_name, ori, pos, Camera.K, scale=5)
