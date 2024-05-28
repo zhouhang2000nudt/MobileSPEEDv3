@@ -300,32 +300,29 @@ class ECP(nn.Module):
     def __init__(self, in_channels: List[int], expand_ratio: Union[int, List[float]], pool_size: List[int]):
         super(ECP, self).__init__()
         self.ECP_p3 = nn.Sequential(
-            RepVGGplusBlock(
+            ConvBnAct(
                 in_channels=in_channels[0],
                 out_channels=int(in_channels[0] * expand_ratio[0]),
-                kernel_size=3,
+                kernel_size=1,
                 stride=1,
-                padding=1
             ),
             nn.AdaptiveAvgPool2d((pool_size[0], pool_size[0])),
         )
         self.ECP_p4 = nn.Sequential(
-            RepVGGplusBlock(
+            ConvBnAct(
                 in_channels=in_channels[1],
                 out_channels=int(in_channels[1] * expand_ratio[1]),
-                kernel_size=3,
+                kernel_size=1,
                 stride=1,
-                padding=1
             ),
             nn.AdaptiveAvgPool2d((pool_size[1], pool_size[1])),
         )
         self.ECP_p5 = nn.Sequential(
-            RepVGGplusBlock(
+            ConvBnAct(
                 in_channels=in_channels[2],
                 out_channels=int(in_channels[2] * expand_ratio[2]),
-                kernel_size=3,
+                kernel_size=1,
                 stride=1,
-                padding=1
             ),
             nn.AdaptiveAvgPool2d((pool_size[2], pool_size[2])),
         )

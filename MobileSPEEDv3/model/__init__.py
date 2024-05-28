@@ -1,1 +1,2 @@
-from .Mobile_SPPEDv3 import Mobile_SPEEDv3
+from .Mobile_SPEEDv3 import Mobile_SPEEDv3
+from .Mobile_SPEEDv3_timm import Mobile_SPEEDv3_timm

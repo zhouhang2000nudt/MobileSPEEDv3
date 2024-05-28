@@ -24,11 +24,12 @@ imgsz: [480, 768]     # 图片大小 [480, 768]
 
 
 # ==========================model==========================
-backbone: mobilenet_v3_large            # mobilenet_v3_large/mobilenet_v3_small/efficientnet_b1
+backbone: resnet34d.ra2_in1k
+# mobilenetv3_large_100.ra_in1k/rexnet_150.nav_in1k/resnet18.a1_in1k/efficientnet_b4.ra2_in1k/efficientnetv2_rw_s.ra2_in1k/resnet34d.ra2_in1k
 SE: true
 pos_dim: 3                             # 位置维度
-stride: 10                             # 步长 度
-neighbor: 0                             # 邻居
+stride: 5                             # 步长 度
+neighbor: 5                             # 邻居
 ratio: 0.0                            # 平滑因子
 pretrained: true
 deform_layers: []
@@ -40,7 +41,7 @@ pool_size: [4, 2, 1]                # 池化尺寸
 ALPHA: [1, 5]                       # Score = ALPHA[0] * Pos_Error + ALPHA[1] * Ori_Error
 BETA: [1, 9, 0]                    # Loss = BETA[0] * Pos_LOSS + BETA[1] * Euler_LOSS + BETA[2] * Ori_LOSS
 pos_loss: MSE                       # 位置损失函数 MAE/MSE/Huber/Log_Cosh (regression loss)
-euler_loss: CrossEntropy_Loss              # 欧拉角损失函数 CrossEntropy/Focal/JS_Divergence/KL_Divergence
+euler_loss: CrossEntropy              # 欧拉角损失函数 CrossEntropy/Focal/JS_Divergence/KL_Divergence
 # ori_loss: MSE                   # 姿态损失函数 MAE/MSE/Huber/Log_Cosh (regression loss)
 
 # ==========================train==========================

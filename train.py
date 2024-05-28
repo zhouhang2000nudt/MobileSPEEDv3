@@ -40,6 +40,7 @@ if __name__ == "__main__":
     # ====================配置====================
     config = get_config()
     
+    
     config["backbone"] = args.backbone
     config["stride"] = args.stride
     config["neighbor"] = args.neighbor
