@@ -13,7 +13,7 @@ class Mobile_SPEEDv3_timm(nn.Module):
         super(Mobile_SPEEDv3_timm, self).__init__()
         
         self.backbone = config["backbone"]
-        self.features = timm.create_model(config["backbone"], pretrained=config["pretrained"], features_only=True, out_indices=[2, 3, 4])
+        self.features = timm.create_model(config["backbone"], pretrained=config["pretrained"], features_only=True, out_indices=[-3, -2, -1])
         
         chennels = self.features.feature_info.channels()
         

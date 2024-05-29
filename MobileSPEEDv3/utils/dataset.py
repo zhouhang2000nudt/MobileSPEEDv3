@@ -3,7 +3,7 @@ from torch.utils.data import Dataset, random_split, Subset, DataLoader
 from pathlib import Path
 from threading import Thread
 from tqdm import tqdm
-from .utils import rotate_image, rotate_cam, translate, Camera, wrap_boxes, bbox_in_image, OriEncoderDecoder
+from .utils import rotate_image, Camera, wrap_boxes, bbox_in_image, OriEncoderDecoder
 from typing import List
 
 import albumentations as A
@@ -95,6 +95,7 @@ def prepare_Speed(config: dict):
 
     # 为Speed类添加属性
     Speed.config = config
+    Speed.camera = Camera(config)
     Speed.data_dir = Path(config["data_dir"])
     Speed.image_dir = Speed.data_dir / "images/train"
     Speed.label_file = Speed.data_dir / "train_label.json"
@@ -111,11 +112,11 @@ def prepare_Speed(config: dict):
             ]),
             "A_transform": A.Compose([
                 A.OneOf([
-                    A.AdvancedBlur(blur_limit=(3, 5),
+                    A.AdvancedBlur(blur_limit=(3, 3),
                                    rotate_limit=25,
                                    p=0.2),
-                    A.Blur(blur_limit=(3, 5), p=0.2),
-                    A.GaussianBlur(blur_limit=(3, 5),
+                    A.Blur(blur_limit=(3, 3), p=0.2),
+                    A.GaussianBlur(blur_limit=(3, 3),
                                    p=0.2),
                     ], p=config["Augmentation"]["p"]),
                 A.ColorJitter(brightness=0.1,
@@ -123,14 +124,8 @@ def prepare_Speed(config: dict):
                               saturation=0.1,
                               hue=0.1,
                               p=config["Augmentation"]["p"]),
-                # A.RandomSunFlare(flare_roi=(0, 0, 1, 1),
-                #                  num_flare_circles_lower=4,
-                #                  num_flare_circles_upper=7,
-                #                  p=config["Augmentation"]["p"]),
-                # A.OneOf([
-                #     A.GaussNoise(p=0.5),
-                #     A.ISONoise(p=0.5)
-                # ], p=config["Augmentation"]["p"]),
+                A.GaussNoise(var_limit=(3, 10),
+                             p=config["Augmentation"]["p"]),
             ],
             p=1,
             bbox_params=A.BboxParams(format="pascal_voc", label_fields=["category_ids"]))
@@ -245,14 +240,28 @@ class ImageReader(Thread):
     def __init__(self, img_name: list, config: dict, image_dir: Path):
         Thread.__init__(self)
         self.config: dict = config
+        self.img_sz = [config["imgsz"][1], config["imgsz"][0]]
         self.image_dir: Path = image_dir
         self.image_name: list = img_name
         self.img_dict: dict = {}
+        self.Resize = A.Compose([A.Resize(height=Speed.config["imgsz"][0], width=Speed.config["imgsz"][1], p=1.0, interpolation=cv.INTER_AREA)],
+        p=1,
+        bbox_params=A.BboxParams(format="pascal_voc", label_fields=["category_ids"]))
     
     def run(self):
         for img_name in tqdm(self.image_name):
-            img = cv.imread(str(self.image_dir / img_name), cv.IMREAD_GRAYSCALE)
-            self.img_dict[img_name] = img
+            image = cv.imread(str(self.image_dir / img_name), cv.IMREAD_GRAYSCALE)
+            bbox = Speed.labels[img_name]["bbox"]
+            if bbox[2] >= 1920:
+                bbox[2] = 1919
+            if bbox[3] >= 1200:
+                bbox[3] = 1199
+            
+            transformed = self.Resize(image=image, bboxes=[bbox], category_ids=[1])
+            image = transformed["image"]
+            bbox = list(map(int, list(transformed["bboxes"][0])))
+            Speed.labels[img_name]["bbox"] = bbox
+            self.img_dict[img_name] = image
     
     def get_result(self) -> dict:
         return self.img_dict
@@ -272,8 +281,8 @@ class Speed(Dataset):
     val_index: Subset       # 验证集图片名列表
     test_index: list        # 测试集图片名列表
     img_dict: dict = {} # 图片字典
-    camera: Camera = Camera
     ori_encoder_decoder: OriEncoderDecoder
+    camera: Camera
     
 
     def __init__(self, mode: str = "train"):
@@ -281,7 +290,7 @@ class Speed(Dataset):
         self.transform = Speed.transform[mode]["transform"]
         self.sample_index = Speed.train_index if "train" in mode else Speed.val_index if "val" in mode else Speed.test_index
         self.mode = mode
-        self.Resize = A.Compose([A.Resize(height=Speed.config["imgsz"][0], width=Speed.config["imgsz"][1], p=1.0)],
+        self.Resize = A.Compose([A.Resize(height=Speed.config["imgsz"][0], width=Speed.config["imgsz"][1], p=1.0, interpolation=cv.INTER_AREA)],
         p=1,
         bbox_params=A.BboxParams(format="pascal_voc", label_fields=["category_ids"]))
     
@@ -293,30 +302,28 @@ class Speed(Dataset):
         # filename = "img001879.jpg"
         if Speed.config["ram"]:
             image = Speed.img_dict[filename]
+            bbox = self.labels[filename]["bbox"]
         else:
             image = cv.imread(str(self.image_dir / filename), cv.IMREAD_GRAYSCALE)       # 读取图片
-        
+            bbox = self.labels[filename]["bbox"]
+            if bbox[2] >= 1920:
+                bbox[2] = 1919
+            if bbox[3] >= 1200:
+                bbox[3] = 1199
+            transformed = self.Resize(image=image, bboxes=[bbox], category_ids=[1])
+            image = transformed["image"]
+            bbox = list(map(int, list(transformed["bboxes"][0])))
+            
         ori = np.array(self.labels[filename]["ori"])   # 姿态
         pos = np.array(self.labels[filename]["pos"])   # 位置
         
-        bbox = self.labels[filename]["bbox"]
-        if bbox[2] >= 1920:
-            bbox[2] = 1919
-        if bbox[3] >= 1200:
-            bbox[3] = 1199
-            
-        # Resize
-        transformed = self.Resize(image=image, bboxes=[bbox], category_ids=[1])
-        image = transformed["image"]
-        bbox = list(map(int, list(transformed["bboxes"][0])))
-        
         # 先进行wrapping
         dice = np.random.rand()
-        if ("train" in self.mode or "self_supervised" in self.mode) and (Speed.config["Rotate"]["Rotate_img"] or Speed.config["Rotate"]["Rotate_cam"]):
+        if ("train" in self.mode or "self_supervised" in self.mode) and (Speed.config["Rotate"]["Rotate_img"]):
             wrapped_time = 0
             bbox_area = (bbox[2] - bbox[0]) * (bbox[3] - bbox[1])
             wrapped = False
-            if Speed.config["Rotate"]["Rotate_img"] and dice <= Speed.config["Rotate"]["p"]:
+            if Speed.config["Rotate"]["Rotate_img"] and dice < Speed.config["Rotate"]["p"]:
                 while True:
                     if wrapped_time > 5:
                         wrapped = False
@@ -327,47 +334,12 @@ class Speed(Dataset):
                     if bbox_in_image(bbox_wrapped, bbox_area):
                         wrapped = True
                         break
-            elif Speed.config["Rotate"]["Rotate_cam"] and dice > Speed.config["Rotate"]["p"]:
-                while True:
-                    if wrapped_time > 5:
-                        wrapped = False
-                        break
-                    wrapped_time += 1
-                    image_wrapped, pos_wrapped, ori_wrapped, M_wrapped = rotate_cam(image, pos, ori, Speed.camera.K, Speed.camera.K_inv, Speed.config["Rotate"]["cam_angle"])
-                    bbox_wrapped = wrap_boxes(np.array([bbox]), M_wrapped, height=image.shape[0], width=image.shape[1]).tolist()[0]
-                    if bbox_in_image(bbox_wrapped, bbox_area):
-                        wrapped = True
-                        break
             
             if wrapped:
                 image = image_wrapped
                 pos = pos_wrapped
                 ori = ori_wrapped
                 bbox = list(map(int, bbox_wrapped))
-        
-        # 进行平移
-        dice = np.random.rand()
-        if ("train" in self.mode or "self_supervised" in self.mode) and (Speed.config["Translate"]):
-            trans_time = 0
-            bbox_area = (bbox[2] - bbox[0]) * (bbox[3] - bbox[1])
-            transed = False
-            if dice < Speed.config["Translate"]["p"]:
-                while True:
-                    if trans_time > 5:
-                        transed = False
-                        break
-                    trans_time += 1
-                    image_transed, pos_transed, ori_transed, M_transed = translate(image, pos, ori, Speed.camera.K, Speed.config["Translate"]["translate"])
-                    bbox_transed = wrap_boxes(np.array([bbox]), M_transed, height=image.shape[0], width=image.shape[1]).tolist()[0]
-                    if bbox_in_image(bbox_transed, bbox_area):
-                        transed = True
-                        break
-            
-            if transed:
-                image = image_transed
-                pos = pos_transed
-                ori = ori_transed
-                bbox = list(map(int, bbox_transed))
                     
         image = cv.cvtColor(image, cv.COLOR_GRAY2RGB)       # 转换为RGB格式
         
@@ -405,11 +377,10 @@ class Speed(Dataset):
             return image_1, image_2
         
         # Resize
-        # transformed = self.Resize(image=image, bboxes=[bbox], category_ids=[1])
-        # image = transformed["image"]
-        # bbox = list(map(int, list(transformed["bboxes"][0])))
+        if "vit" in Speed.config["backbone"] or "former" in Speed.config["backbone"]:
+            image = cv.resize(image, (224, 224), interpolation=cv.INTER_LINEAR)
         # 使用torchvision转换图片
-        # image = self.transform(image)       # (3, 480, 768)
+        image = self.transform(image)       # (3, 480, 768)
         
         yaw_encode, pitch_encode, roll_encode = Speed.ori_encoder_decoder.encode_ori(ori)
         ori_decode = Speed.ori_encoder_decoder.decode_ori_batch(torch.tensor(yaw_encode).unsqueeze(0),

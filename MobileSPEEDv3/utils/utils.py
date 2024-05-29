@@ -4,39 +4,22 @@ Utility functions
 """
 
 import torch
-import os
-import math
-import random
 import numpy as np
-import scipy
-import skimage.color
-import skimage.io
-import skimage.transform
-import urllib.request
-import shutil
-import warnings
-import random
-import itertools
 import cv2
-from scipy import stats
-import matplotlib.pyplot as plt
 from scipy.spatial.transform import Rotation as R
 from torch import Tensor
 
 class Camera:
     fwx = 0.0176  # focal length[m]
     fwy = 0.0176  # focal length[m]
-    # width = 1920  # number of horizontal[pixels]
-    # height = 1200  # number of vertical[pixels]
-    width = int(1920/5)  # number of horizontal[pixels]
-    height = int(1200/5)  # number of vertical[pixels]
     ppx = 5.86e-6  # horizontal pixel pitch[m / pixel]
     ppy = ppx  # vertical pixel pitch[m / pixel]
     fx = fwx / ppx  # horizontal focal length[pixels]
     fy = fwy / ppy  # vertical focal length[pixels]
-
-    K = np.array([[fx, 0, width / 2], [0, fy, height / 2], [0, 0, 1]])
-    K_inv = np.linalg.inv(K)
+    
+    def __init__(self, config):
+        self.K = np.array([[self.fx, 0, config["imgsz"][1] / 2], [0, self.fy, config["imgsz"][0] / 2], [0, 0, 1]])
+        self.K_inv = np.linalg.inv(self.K)
 
 
 def wrap_boxes(boxes, M, width, height):

@@ -2,7 +2,6 @@ import cv2
 import matplotlib.pyplot as plt
 import numpy as np
 
-from .utils import Camera
 from spatialmath import SE3
 from spatialmath.base import q2r
 from scipy.spatial.transform import Rotation as R

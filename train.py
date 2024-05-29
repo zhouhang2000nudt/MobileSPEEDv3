@@ -6,11 +6,10 @@ import torch
 import argparse
 
 from MobileSPEEDv3.utils.config import get_config
-from MobileSPEEDv3.utils.dataset import SpeedDataModule, prepare_Speed
+from MobileSPEEDv3.utils.dataset import SpeedDataModule
 from MobileSPEEDv3.module.Lightning_MobileSPEEDv3 import LightningMobileSPEEDv3
 
 from lightning.pytorch import Trainer
-from lightning.pytorch import seed_everything
 from lightning.pytorch.callbacks import LearningRateMonitor
 from lightning.pytorch.plugins import MixedPrecision, DoublePrecision, Precision, BitsandbytesPrecision, HalfPrecision
 from lightning.pytorch.callbacks import RichProgressBar, TQDMProgressBar, ModelSummary, RichModelSummary
@@ -18,28 +17,28 @@ from lightning.pytorch.callbacks import ModelCheckpoint
 from lightning.pytorch.callbacks import DeviceStatsMonitor, LearningRateMonitor
 from lightning.pytorch.loggers import CometLogger
 from lightning.pytorch.profilers import SimpleProfiler
+from lightning.pytorch.callbacks import StochasticWeightAveraging
 
 
 
 if __name__ == "__main__":
     
-    parser = argparse.ArgumentParser()
-    
-    parser.add_argument("--backbone", type=str, default="mobilenet_v3_large", help="backbone")
-    parser.add_argument("--stride", type=int, default=10, help="stride")
-    parser.add_argument("--neighbor", type=int, default=3, help="neighbor")
-    parser.add_argument("--ratio", type=float, default=0.1, help="ratio")
-    parser.add_argument("--img_angle", type=float, default=60, help="img_angle")
-    parser.add_argument("--cam_angle", type=float, default=10, help="cam_angle")
-    parser.add_argument("--Rotatep", type=float, default=0.8, help="Rotatep")
-    parser.add_argument("--CropAndPadp", type=float, default=0.2, help="CropAndPadp")
-    parser.add_argument("--DropBlockSafep", type=float, default=0.2, help="DropBlockp")
-    parser.add_argument("--Augmentationp", type=float, default=0.2, help="augmentp")
-    
-    args = parser.parse_args()
     # ====================配置====================
     config = get_config()
     
+    parser = argparse.ArgumentParser()
+    
+    parser.add_argument("--backbone", type=str, default=config["backbone"], help="backbone")
+    parser.add_argument("--stride", type=int, default=config["stride"], help="stride")
+    parser.add_argument("--neighbor", type=int, default=config["neighbor"], help="neighbor")
+    parser.add_argument("--ratio", type=float, default=config["ratio"], help="ratio")
+    parser.add_argument("--img_angle", type=float, default=config["Rotate"]["img_angle"], help="img_angle")
+    parser.add_argument("--Rotatep", type=float, default=config["Rotate"]["p"], help="Rotatep")
+    parser.add_argument("--CropAndPadp", type=float, default=config["CropAndPad"]["p"], help="CropAndPadp")
+    parser.add_argument("--DropBlockSafep", type=float, default=config["DropBlockSafe"]["p"], help="DropBlockp")
+    parser.add_argument("--Augmentationp", type=float, default=config["Augmentation"]["p"], help="augmentp")
+    
+    args = parser.parse_args()
     
     config["backbone"] = args.backbone
     config["stride"] = args.stride
@@ -89,7 +88,8 @@ if __name__ == "__main__":
         summary = RichModelSummary(max_depth=3)
     elif config["summary"] == "default":
         summary = ModelSummary(max_depth=3)
-    callbacks = [lr_monitor, checkpoint, summary, bar]
+    SWA = StochasticWeightAveraging(swa_lrs=config["lr_min"])
+    callbacks = [lr_monitor, checkpoint, summary, bar, SWA]
 
     # ===================plugins=================
     plugins = []

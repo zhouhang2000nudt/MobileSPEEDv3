@@ -17,15 +17,14 @@ self_supervised: false
 
 
 # =========================dataset=========================
-data_dir: ../datasets/speed     # 数据路径
+data_dir: ../../gemini/data-1/datasets/speed     # 数据路径
 workers: 20            # dataloader workers
 ram: true            # 是否使用内存加载数据
 imgsz: [240, 384]     # 图片大小 [480, 768]
 
 
 # ==========================model==========================
-backbone: resnet34d.ra2_in1k
-# mobilenetv3_large_100.ra_in1k/rexnet_150.nav_in1k/resnet18.a1_in1k/efficientnet_b4.ra2_in1k/efficientnetv2_rw_s.ra2_in1k/resnet34d.ra2_in1k
+backbone: repvit_m0_9.dist_450e_in1k
 SE: true
 pos_dim: 3                             # 位置维度
 stride: 5                             # 步长 度
@@ -50,7 +49,7 @@ lr0: 0.0005             # 初始学习率
 momentum: 0.937       # 动量
 weight_decay: 0.01    # 权重衰减
 epoch: 200            # 训练轮数
-batch_size: 30        # 批次大小
+batch_size: 60        # 批次大小
 precision: mix        # 训练精度 half/mix/double/full/int8
 accumulate_grad_batches: 1            # 累计梯度批次
 lr_scheduler: WarmupCosineAnnealingLR # 学习率调度器 WarmupCosineAnnealingLR/ReduceLROnPlateau/MultiStepLR
@@ -69,18 +68,12 @@ milestones: [30, 60]  # 学习率衰减里程碑
 
 # ==========================Augmentation===================
 Augmentation:
-  p: 0.2
+  p: 0.1
 
 Rotate:
   Rotate_img: true
-  Rotate_cam: false
-  img_angle: 60
-  cam_angle: 10
+  img_angle: 90
   p: 1.0             # p为图片旋转的概率，(1-p)为相机旋转的概率
-
-Translate:
-  p: 0.0
-  translate: 0.5
 
 CropAndPad:
   p: 0.5
