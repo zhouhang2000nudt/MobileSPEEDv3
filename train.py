@@ -45,13 +45,12 @@ if __name__ == "__main__":
     config["neighbor"] = args.neighbor
     config["ratio"] = args.ratio
     config["Rotate"]["img_angle"] = args.img_angle
-    config["Rotate"]["cam_angle"] = args.cam_angle
     config["Rotate"]["p"] = args.Rotatep
     config["CropAndPad"]["p"] = args.CropAndPadp
     config["DropBlockSafe"]["p"] = args.DropBlockSafep
     config["Augmentation"]["p"] = args.Augmentationp
     
-    config["name"] = f"{config['backbone']}-{config['stride']}_{config['neighbor']}_{config['ratio']}-{config['Rotate']['img_angle']}_{config['Rotate']['cam_angle']}_{config['Rotate']['p']}-{config['CropAndPad']['p']}-{config['DropBlockSafe']['p']}-{config['Augmentation']['p']}"
+    config["name"] = f"{config['backbone']}-{config['stride']}_{config['neighbor']}_{config['ratio']}-{config['Rotate']['img_angle']}_{config['Rotate']['p']}-{config['CropAndPad']['p']}-{config['DropBlockSafe']['p']}-{config['Augmentation']['p']}"
     
     torch.set_float32_matmul_precision("high")
     
