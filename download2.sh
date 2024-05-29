@@ -1,5 +1,8 @@
 #! bin/bash
 
+wget https://hf-mirror.com/hfd/hfd.sh
+chmod a+x hfd.sh
+
 export HF_ENDPOINT=https://hf-mirror.com
 
 # resnet
