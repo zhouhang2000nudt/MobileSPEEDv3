@@ -18,8 +18,8 @@ self_supervised: false
 
 # =========================dataset=========================
 data_dir: ../../gemini/data-1/datasets/speed     # 数据路径
-workers: 1            # dataloader workers
-ram: false            # 是否使用内存加载数据
+workers: 20            # dataloader workers
+ram: true            # 是否使用内存加载数据
 imgsz: [240, 384]     # 图片大小 [480, 768]
 
 
@@ -49,7 +49,7 @@ lr0: 0.0005             # 初始学习率
 momentum: 0.937       # 动量
 weight_decay: 0.01    # 权重衰减
 epoch: 200            # 训练轮数
-batch_size: 2        # 批次大小
+batch_size: 60        # 批次大小
 precision: mix        # 训练精度 half/mix/double/full/int8
 accumulate_grad_batches: 1            # 累计梯度批次
 lr_scheduler: WarmupCosineAnnealingLR # 学习率调度器 WarmupCosineAnnealingLR/ReduceLROnPlateau/MultiStepLR
