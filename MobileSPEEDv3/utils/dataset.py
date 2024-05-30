@@ -108,7 +108,6 @@ def prepare_Speed(config: dict):
         "train": {
             "transform": v2.Compose([
                 v2.ToTensor(),
-                # v2.Resize(size=config["imgsz"]),
             ]),
             "A_transform": A.Compose([
                 A.OneOf([
@@ -134,28 +133,31 @@ def prepare_Speed(config: dict):
         "val": {
             "transform": v2.Compose([
                 v2.ToTensor(),
-                # v2.Resize(size=config["imgsz"]),
-            ]),
-            "A_transform": None,
-        },
-        "test": {
-            "transform": v2.Compose([
-                v2.ToTensor(),
-                # v2.Resize(size=config["imgsz"]),
             ]),
             "A_transform": None,
         },
         "self_supervised_train": {
             "transform": v2.Compose([
                 v2.ToTensor(),
-                # v2.Resize(size=config["imgsz"]),
             ]),
-            "A_transform": A.Compose([
+            "A_transform": [A.Compose([
+                A.Flip(p=0.5),
+                A.Affine(translate_percent={"x": (-0.2, 0.2), "y": (-0.2, 0.2)},
+                         p=1),
+                A.SafeRotate(limit=180, p=1.0),
+                A.Compose([
+                    A.BBoxSafeRandomCrop(p=1.0),
+                    A.PadIfNeeded(min_height=config["imgsz"][0], min_width=config["imgsz"][1], border_mode=cv.BORDER_REPLICATE, position="random", p=1.0),
+                ], p=1)
+            ],
+            p=1,
+            bbox_params=A.BboxParams(format="pascal_voc", label_fields=["category_ids"])),
+            A.Compose([
                 A.OneOf([
-                    A.AdvancedBlur(blur_limit=(3, 5),
+                    A.AdvancedBlur(blur_limit=(3, 7),
                                    rotate_limit=25,
                                    p=0.2),
-                    A.Blur(blur_limit=(3, 5), p=0.2),
+                    A.Blur(blur_limit=(3, 7), p=0.2),
                     A.GaussNoise(var_limit=(5, 15),
                                  p=0.2),
                     A.GaussianBlur(blur_limit=(3, 7),
@@ -165,21 +167,15 @@ def prepare_Speed(config: dict):
                               contrast=0.3,
                               saturation=0.3,
                               hue=0.3,
-                              p=1),
-                A.Affine(translate_percent={"x": (-0.2, 0.2), "y": (-0.2, 0.2)},
-                         p=1),
-                A.Compose([
-                    A.BBoxSafeRandomCrop(p=1.0),
-                    A.PadIfNeeded(min_height=1200, min_width=1920, border_mode=cv.BORDER_REPLICATE, position="random", p=1.0),
-                ], p=1),
+                              p=1)
             ],
             p=1,
             bbox_params=A.BboxParams(format="pascal_voc", label_fields=["category_ids"]))
+            ]
         },
         "self_supervised_val": {
             "transform": v2.Compose([
                 v2.ToTensor(),
-                # v2.Resize(size=config["imgsz"]),
             ]),
             "A_transform": [A.Compose([
                 A.Flip(p=0.5),
@@ -188,7 +184,7 @@ def prepare_Speed(config: dict):
                 A.SafeRotate(limit=180, p=1.0),
                 A.Compose([
                     A.BBoxSafeRandomCrop(p=1.0),
-                    A.PadIfNeeded(min_height=1200, min_width=1920, border_mode=cv.BORDER_REPLICATE, position="random", p=1.0),
+                    A.PadIfNeeded(min_height=config["imgsz"][0], min_width=config["imgsz"][1], border_mode=cv.BORDER_REPLICATE, position="random", p=1.0),
                 ], p=1)
             ],
             p=1,
@@ -225,7 +221,6 @@ def prepare_Speed(config: dict):
     train_num = int(num * Speed.config["split"][0])
     val_num = num - train_num
     Speed.train_index, Speed.val_index = random_split(Speed.img_name, [train_num, val_num])
-    # Speed.test_index = list(Speed.test_labels.keys())
 
     # 缓存图片
     if Speed.config["ram"]:
@@ -354,10 +349,12 @@ class Speed(Dataset):
             image_1 = transformed_1["image"]
             bbox_1 = list(map(int, list(transformed_1["bboxes"][0])))
             image_1 = CropAndPad(image_1, bbox_1)
+            image_1 = DropBlockSafe(image_1, bbox=bbox_1, drop_num_lim=Speed.config["DropBlockSafe"]["drop_num_lim"])
             transformed_2 = self.A_transform[1](image=image, bboxes=[bbox], category_ids=[1])
             image_2 = transformed_2["image"]
             bbox_2 = list(map(int, list(transformed_2["bboxes"][0])))
             image_2 = CropAndPad(image_2, bbox_2)
+            image_2 = DropBlockSafe(image_2, bbox=bbox_2, drop_num_lim=Speed.config["DropBlockSafe"]["drop_num_lim"])
         else:
             if self.A_transform is not None:
                 transformed = self.A_transform(image=image, bboxes=[bbox], category_ids=[1])

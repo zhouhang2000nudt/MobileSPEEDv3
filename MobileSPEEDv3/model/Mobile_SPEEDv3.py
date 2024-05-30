@@ -11,6 +11,8 @@ class Mobile_SPEEDv3(nn.Module):
     def __init__(self, config: dict):
         super(Mobile_SPEEDv3, self).__init__()
         
+        if config["self_supervised"]:
+            self.supervised = True
         self.backbone = config["backbone"]
         self.features = timm.create_model(config["backbone"], pretrained=config["pretrained"], features_only=True, out_indices=[-3, -2, -1])
         
@@ -42,7 +44,7 @@ class Mobile_SPEEDv3(nn.Module):
         self.pitch_head = Head_single(head_in_features, dim=int(180 // config["stride"] + 1 + 2 * config["neighbor"]), softmax=True)
         self.roll_head = Head_single(head_in_features, dim=int(360 // config["stride"] + 1 + 2 * config["neighbor"]), softmax=True)
         
-    def forward(self, x: Tensor):
+    def forward_once(self, x: Tensor):
         p3, p4, p5 = self.features(x)
         
         # p3, p4, p5 = self.chennel_align([p3, p4, p5])
@@ -64,6 +66,11 @@ class Mobile_SPEEDv3(nn.Module):
         pitch = self.pitch_head(ori)
         roll = self.roll_head(ori)
         return pos, yaw, pitch, roll
+    
+    def forward(self, x1: Tensor, x2: Tensor = None):
+        if self.supervised:
+            return self.forward_once(x1), self.forward_once(x2)
+        return self.forward_once(x1)
 
     def switch_repvggplus_to_deploy(self):
         for m in self.modules():
