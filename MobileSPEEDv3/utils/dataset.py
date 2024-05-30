@@ -3,7 +3,7 @@ from torch.utils.data import Dataset, random_split, Subset, DataLoader
 from pathlib import Path
 from threading import Thread
 from tqdm import tqdm
-from .utils import rotate_image, Camera, wrap_boxes, bbox_in_image, OriEncoderDecoder
+from .utils import rotate_image, Camera, wrap_boxes, bbox_in_image, OriEncoderDecoder, OriEncoderDecoderGauss
 from typing import List
 
 import albumentations as A
@@ -228,7 +228,8 @@ def prepare_Speed(config: dict):
         Speed.read_img()
     
     # 设置姿态编码解码器
-    Speed.ori_encoder_decoder = OriEncoderDecoder(Speed.config["stride"], Speed.config["ratio"], Speed.config["neighbor"])
+    # Speed.ori_encoder_decoder = OriEncoderDecoder(Speed.config["stride"], Speed.config["ratio"], Speed.config["neighbor"])
+    Speed.ori_encoder_decoder = OriEncoderDecoderGauss(Speed.config["stride"], Speed.config("sigma"), Speed.config["tau"])
 
 
 class ImageReader(Thread):

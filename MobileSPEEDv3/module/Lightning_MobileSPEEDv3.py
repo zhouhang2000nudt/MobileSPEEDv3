@@ -10,7 +10,7 @@ from ..model.Mobile_SPEEDv3 import Mobile_SPEEDv3
 from ..model.Mobile_SPEEDv3_timm import Mobile_SPEEDv3_timm
 from ..utils.loss import PoseLoss, EulerLoss, OriLoss
 from ..utils.metrics import Loss, PosError, OriError, Score
-from ..utils.utils import OriEncoderDecoder
+from ..utils.utils import OriEncoderDecoder, OriEncoderDecoderGauss
 
 
 class LightningMobileSPEEDv3(L.LightningModule):
@@ -19,10 +19,14 @@ class LightningMobileSPEEDv3(L.LightningModule):
         # 配置
         self.config: dict = config
         # 模型
-        self.model: Mobile_SPEEDv3 = Mobile_SPEEDv3(self.config)
+        if not self.config["no_neck"]:
+            self.model: Mobile_SPEEDv3 = Mobile_SPEEDv3(self.config)
+        else:
+            self.model: Mobile_SPEEDv3_timm = Mobile_SPEEDv3_timm(self.config)
         # self.model: Mobile_SPEEDv3 = Mobile_SPEEDv3_timm(self.config)
         # 欧拉角编码解码器
-        self.ori_encoder_decoder: OriEncoderDecoder = OriEncoderDecoder(self.config["stride"], self.config["ratio"], neighbour=self.config["neighbor"], device="cuda" if config["accelerator"] == "gpu" else config["accelerator"])
+        # self.ori_encoder_decoder: OriEncoderDecoder = OriEncoderDecoder(self.config["stride"], self.config["ratio"], neighbour=self.config["neighbor"], device="cuda" if config["accelerator"] == "gpu" else config["accelerator"])
+        self.ori_encoder_decoder: OriEncoderDecoderGauss = OriEncoderDecoderGauss(self.config["stride"], self.config["sigma"], neighbour=self.config["tau"], device="cuda" if config["accelerator"] == "gpu" else config["accelerator"])
         # 损失函数
         self.pos_loss: PoseLoss = PoseLoss(self.config["pos_loss"])
         self.yaw_loss: EulerLoss = EulerLoss(self.config["euler_loss"])

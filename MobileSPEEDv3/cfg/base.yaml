@@ -20,17 +20,18 @@ self_supervised: false
 data_dir: ../datasets/speed     # 数据路径
 workers: 20            # dataloader workers
 ram: true            # 是否使用内存加载数据
-imgsz: [240, 384]     # 图片大小 [480, 768]
+imgsz: [480, 768]     # 图片大小 [480, 768]
 
 
 # ==========================model==========================
 backbone: rexnet_200.nav_in1k         # 100/130/150/200
+no_neck: false
 SE: true
 pos_dim: 3                             # 位置维度
 stride: 5                             # 步长 度
-neighbor: 5                             # 邻居
-ratio: 0.1                            # 平滑因子
-pretrained: true
+sigma: 1                              # 标准差
+tau: 3                                
+pretrained: false
 deform_layers: []
 neck: SPAN                            # FPNPAN/BiFPN/AFPN/SFPN
 expand_ratio: [1, 1, 1]                 # 扩张率

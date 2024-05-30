@@ -90,6 +90,51 @@ class DCNv2(nn.Module):
         self.conv_offset_mask.bias.data.zero_()
 
 
+class C2f(nn.Module):
+    """Faster Implementation of CSP Bottleneck with 2 convolutions."""
+
+    def __init__(self, c1, c2, n=1, shortcut=False, g=1, e=0.5):
+        """Initialize CSP bottleneck layer with two convolutions with arguments ch_in, ch_out, number, shortcut, groups,
+        expansion.
+        """
+        super().__init__()
+        self.c = int(c2 * e)  # hidden channels
+        self.cv1 = ConvBnAct(c1, 2 * self.c, 1, 1, act_layer=nn.SiLU)  # input conv
+        self.cv2 = ConvBnAct((2 + n) * self.c, c2, 1, act_layer=nn.SiLU)  # optional act=FReLU(c2)
+        self.m = nn.ModuleList(C2F_Bottleneck(self.c, self.c, shortcut, g, k=(3, 3), e=1.0) for _ in range(n))
+
+    def forward(self, x):
+        """Forward pass through C2f layer."""
+        y = list(self.cv1(x).chunk(2, 1))
+        y.extend(m(y[-1]) for m in self.m)
+        return self.cv2(torch.cat(y, 1))
+
+    def forward_split(self, x):
+        """Forward pass using split() instead of chunk()."""
+        y = list(self.cv1(x).split((self.c, self.c), 1))
+        y.extend(m(y[-1]) for m in self.m)
+        return self.cv2(torch.cat(y, 1))
+
+
+class C2F_Bottleneck(nn.Module):
+    """Standard bottleneck."""
+
+    def __init__(self, c1, c2, shortcut=True, g=1, k=(3, 3), e=0.5):
+        """Initializes a bottleneck module with given input/output channels, shortcut option, group, kernels, and
+        expansion.
+        """
+        super().__init__()
+        c_ = int(c2 * e)  # hidden channels
+        self.cv1 = ConvBnAct(c1, c_, k[0], 1)
+        self.cv2 = ConvBnAct(c_, c2, k[1], 1, groups=g)
+        self.add = shortcut and c1 == c2
+
+    def forward(self, x):
+        """'forward()' applies the YOLO FPN to input data."""
+        return x + self.cv2(self.cv1(x)) if self.add else self.cv2(self.cv1(x))
+
+
+
 
 # ================== block end =================
 
@@ -213,13 +258,14 @@ class ShortBiFPN(nn.Module):
 class Align(nn.Module):
     def __init__(self, in_channels: List[int], out_channels: List[int]):
         super(Align, self).__init__()
-        self.p3_align = ConvBnAct(in_channels=in_channels[0], out_channels=out_channels[0], kernel_size=3, stride=1, padding=1)
-        self.p4_align = ConvBnAct(in_channels=in_channels[1], out_channels=out_channels[1], kernel_size=3, stride=1, padding=1)
-        self.p5_align = ConvBnAct(in_channels=in_channels[2], out_channels=out_channels[2], kernel_size=3, stride=1, padding=1)
+        self.p3_align = ConvBnAct(in_channels=in_channels[0], out_channels=out_channels[0], kernel_size=1, stride=1)
+        self.p4_align = ConvBnAct(in_channels=in_channels[1], out_channels=out_channels[1], kernel_size=1, stride=1)
+        self.p5_align_pos = ConvBnAct(in_channels=in_channels[2], out_channels=out_channels[2], kernel_size=1, stride=1)
+        self.p5_align_ori = ConvBnAct(in_channels=in_channels[2], out_channels=out_channels[2], kernel_size=1, stride=1)
     
     def forward(self, x):
         p3, p4, p5 = x
-        return self.p3_align(p3), self.p4_align(p4), self.p5_align(p5)
+        return self.p3_align(p3), self.p4_align(p4), self.p5_align_pos(p5), self.p5_align_ori(p5)
 
 class SFPN(nn.Module):
     def __init__(self, in_channels: List[int], fuse_mode: str = "cat", SE: bool = False):
@@ -232,8 +278,8 @@ class SFPN(nn.Module):
             raise NotImplementedError("Not implemented yet")
             pass
         
-        self.p4_fuseconv_pos_up = RepVGGplusBlock(in_channels=fused_channel_p45, out_channels=in_channels[1], kernel_size=3, stride=1, padding=1)
-        self.p4_fuseconv_ori_up = RepVGGplusBlock(in_channels=fused_channel_p45, out_channels=in_channels[1], kernel_size=3, stride=1, padding=1)
+        self.p4_fuseconv_pos_up = C2f(c1=fused_channel_p45, c2=in_channels[1], n=1, shortcut=True, g=1, e=0.5)
+        self.p4_fuseconv_ori_up = C2f(c1=fused_channel_p45, c2=in_channels[1], n=1, shortcut=True, g=1, e=0.5)
         
         self.p4_exchange_conv = ConvBnAct(in_channels=2*in_channels[1], out_channels=2*in_channels[1], kernel_size=1, stride=1)
         if SE:
@@ -241,8 +287,8 @@ class SFPN(nn.Module):
         else:
             self.p4_SE = nn.Identity()
         
-        self.p3_fuseconv_pos_up = RepVGGplusBlock(in_channels=fused_channel_p34, out_channels=in_channels[0], kernel_size=3, stride=1, padding=1)
-        self.p3_fuseconv_ori_up = RepVGGplusBlock(in_channels=fused_channel_p34, out_channels=in_channels[0], kernel_size=3, stride=1, padding=1)
+        self.p3_fuseconv_pos_up = C2f(c1=fused_channel_p34, c2=in_channels[0], n=2, shortcut=True, g=1, e=0.5)
+        self.p3_fuseconv_ori_up = C2f(c1=fused_channel_p34, c2=in_channels[0], n=2, shortcut=True, g=1, e=0.5)
         
         self.p3_exchange_conv = ConvBnAct(in_channels=2*in_channels[0], out_channels=2*in_channels[0], kernel_size=1, stride=1)
         if SE:
@@ -253,13 +299,13 @@ class SFPN(nn.Module):
         self.p3_downconv_pos_down = ConvBnAct(in_channels=in_channels[0], out_channels=in_channels[0], kernel_size=3, stride=2)
         self.p3_downconv_ori_down = ConvBnAct(in_channels=in_channels[0], out_channels=in_channels[0], kernel_size=3, stride=2)
         
-        self.p4_fuseconv_pos_down = RepVGGplusBlock(in_channels=fused_channel_p34, out_channels=in_channels[1], kernel_size=3, stride=1, padding=1)        
-        self.p4_fuseconv_ori_down = RepVGGplusBlock(in_channels=fused_channel_p34, out_channels=in_channels[1], kernel_size=3, stride=1, padding=1)
+        self.p4_fuseconv_pos_down = C2f(c1=fused_channel_p34, c2=in_channels[1], n=2, shortcut=True, g=1, e=0.5)        
+        self.p4_fuseconv_ori_down = C2f(c1=fused_channel_p34, c2=in_channels[1], n=2, shortcut=True, g=1, e=0.5)
         self.p4_downconv_pos_down = ConvBnAct(in_channels=in_channels[1], out_channels=in_channels[1], kernel_size=3, stride=2)
         self.p4_downconv_ori_down = ConvBnAct(in_channels=in_channels[1], out_channels=in_channels[1], kernel_size=3, stride=2)
         
-        self.p5_fuseconv_pos_down = RepVGGplusBlock(in_channels=fused_channel_p45, out_channels=in_channels[2], kernel_size=3, stride=1, padding=1)
-        self.p5_fuseconv_ori_down = RepVGGplusBlock(in_channels=fused_channel_p45, out_channels=in_channels[2], kernel_size=3, stride=1, padding=1)
+        self.p5_fuseconv_pos_down = C2f(c1=fused_channel_p45, c2=in_channels[2], n=1, shortcut=True, g=1, e=0.5)
+        self.p5_fuseconv_ori_down = C2f(c1=fused_channel_p45, c2=in_channels[2], n=1, shortcut=True, g=1, e=0.5)
         
         
     

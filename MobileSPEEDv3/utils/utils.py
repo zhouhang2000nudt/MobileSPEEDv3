@@ -150,36 +150,6 @@ def rotate_cam(image, pos, ori, K, K_inv, rot_max_magnitude):
 
     return image_warped, pos_new, ori_new, warp_matrix
 
-def translate(image, pos, ori, K, trans_max_magnitude):
-    # 随机平移
-    changex = (np.random.rand()-0.5) * trans_max_magnitude
-    changey = (np.random.rand()-0.5) * trans_max_magnitude
-    changex = 0.2
-    changey = 0.0
-    
-    point = [0, 0, 0, 1]
-    r_origin = np.array([[1, 0, 0, pos[0]],
-                          [0, 1, 0, pos[1]],
-                          [0, 0, 1, pos[2]],
-                          [0, 0, 0, 1]])
-    r_new = np.array([[1, 0, 0, pos[0] + changex],
-                      [0, 1, 0, pos[1] + changey],
-                      [0, 0, 1, pos[2]],
-                      [0, 0, 0, 1]])
-    
-    trans_mat = K @ np.array([changex, changey, 0])
-    trans_mat = np.array([[1, 0, trans_mat[0]],
-                          [0, 1, trans_mat[1]],
-                          [0, 0, 1]])
-    
-    height, width = np.shape(image)[:2]
-    image_transed = cv2.warpPerspective(image, trans_mat, (width, height), cv2.WARP_INVERSE_MAP, flags=cv2.INTER_LINEAR)
-    
-    pos_new = pos + np.array([changex, changey, 0])
-    ori_new = ori
-    
-    return image_transed, pos_new, ori_new, trans_mat
-
 class OriEncoderDecoder:
     def __init__(self, stride: int, alpha: float, neighbour: int = 0, device: str = 'cpu'):
         assert 360 % stride == 0 and 180 % stride == 0, "stride must be a divisor of 360 and 180"
@@ -277,3 +247,89 @@ class OriEncoderDecoder:
         q3 = -sy * sp * cr + cy * cp * sr
         
         return torch.stack([q0, q1, q2, q3], dim=1)
+
+
+class OriEncoderDecoderGauss:
+    def __init__(self, stride: float, s: float, tau: int = 5, device: str = 'cpu'):
+        assert 360 % stride == 0 and 180 % stride == 0, "stride must be a divisor of 360 and 180"
+
+        self.stride = stride
+        self.s = s
+        self.tau = tau
+        self.extra = max([self.tau * self.s, 3])
+        
+        self.yaw_len = int(360 / stride + 1 + 2 * tau)
+        self.pitch_len = int(180 / stride + 1 + 2 * tau)
+        self.roll_len = int(360 / stride + 1 + 2 * tau)
+        
+        self.yaw_range = torch.linspace(-self.extra * stride, 360 + self.extra * stride, self.yaw_len) - 180
+        self.pitch_range = torch.linspace(-self.extra * stride, 180 + self.extra * stride, self.pitch_len) - 90
+        self.roll_range = torch.linspace(-self.extra * stride, 360 + self.extra * stride, self.roll_len) - 180
+        
+        self.yaw_range.requires_grad_(False)
+        self.pitch_range.requires_grad_(False)
+        self.roll_range.requires_grad_(False)
+        self.yaw_range = self.yaw_range.to(device)
+        self.pitch_range = self.pitch_range.to(device)
+        self.roll_range = self.roll_range.to(device)
+        
+        # self.yaw_index_dict = {int(yaw // stride): i for i, yaw in enumerate(self.yaw_range)}
+        # self.pitch_index_dict = {int(pitch // stride): i for i, pitch in enumerate(self.pitch_range)}
+        # self.roll_index_dict = {int(roll // stride): i for i, roll in enumerate(self.roll_range)}
+    
+    def rho_sc(self, x, s, c):
+        return torch.exp(-(x - c)**2 / (2 * s**2))
+    
+    def _encode_ori(self, angle: float, angle_len: Tensor, angle_l: float):
+        encode = torch.zeros(angle_len)
+        
+        c = (angle - angle_l) / self.stride
+        l_index = int(torch.ceil(c - self.extra))
+        r_index = int(torch.floor(c + self.extra))
+        indexes = torch.arange(l_index, r_index + 1, 1)
+        
+        rho = self.rho_sc(indexes, self.s, c)
+        encode[l_index:r_index+1] = rho / rho.sum()
+
+        return encode
+
+    def encode_ori(self, ori):
+        rotation = R.from_quat([ori[1], ori[2], ori[3], ori[0]])
+        yaw, pitch, roll = rotation.as_euler('YXZ', degrees=True)    # 偏航角、俯仰角、翻滚角
+        print(yaw, pitch, roll)
+        
+        yaw_encode = self._encode_ori(yaw, self.yaw_len, self.yaw_range[0])
+        pitch_encode = self._encode_ori(pitch, self.pitch_len, self.pitch_range[0])
+        roll_encode = self._encode_ori(roll, self.roll_len, self.roll_range[0])
+        return yaw_encode, pitch_encode, roll_encode
+    
+    def decode_ori(self, yaw_encode: Tensor, pitch_encode: Tensor, roll_encode: Tensor):
+        yaw_decode = torch.sum(yaw_encode * self.yaw_range)
+        pitch_decode = torch.sum(pitch_encode * self.pitch_range)
+        roll_decode = torch.sum(roll_encode * self.roll_range)
+        
+        rotation = R.from_euler('YXZ', [yaw_decode, pitch_decode, roll_decode], degrees=True)
+        ori = rotation.as_quat()
+        ori = [ori[3], ori[0], ori[1], ori[2]]
+        return torch.tensor(ori)
+
+    def decode_ori_batch(self, yaw_encode: Tensor, pitch_encode: Tensor, roll_encode: Tensor):
+        
+        yaw_decode = torch.sum(yaw_encode * self.yaw_range, dim=1)
+        pitch_decode = torch.sum(pitch_encode * self.pitch_range, dim=1)
+        roll_decode = torch.sum(roll_encode * self.roll_range, dim=1)
+        
+        cy = torch.cos(torch.deg2rad(yaw_decode * 0.5))
+        sy = torch.sin(torch.deg2rad(yaw_decode * 0.5))
+        cp = torch.cos(torch.deg2rad(pitch_decode * 0.5))
+        sp = torch.sin(torch.deg2rad(pitch_decode * 0.5))
+        cr = torch.cos(torch.deg2rad(roll_decode * 0.5))
+        sr = torch.sin(torch.deg2rad(roll_decode * 0.5))
+        
+        q0 = cy * cp * cr + sy * sp * sr
+        q1 = cy * sp * cr + sy * cp * sr
+        q2 = sy * cp * cr - cy * sp * sr
+        q3 = -sy * sp * cr + cy * cp * sr
+        
+        return torch.stack([q0, q1, q2, q3], dim=1)
+    

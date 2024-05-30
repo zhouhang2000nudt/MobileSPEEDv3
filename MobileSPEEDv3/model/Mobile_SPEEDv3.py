@@ -13,23 +13,20 @@ class Mobile_SPEEDv3(nn.Module):
         
         if config["self_supervised"]:
             self.supervised = True
+        else:
+            self.supervised = False
         self.backbone = config["backbone"]
         self.features = timm.create_model(config["backbone"], pretrained=config["pretrained"], features_only=True, out_indices=[-3, -2, -1])
         
         neck_in_channels = self.features.feature_info.channels()
         
-        SPPF_in_channels =neck_in_channels[-1] 
-        SPPF_out_channels = SPPF_in_channels
-
-        self.SPPF_pos = SPPF(in_channels=SPPF_in_channels,
-                             out_channels=SPPF_out_channels)
-        self.SPPF_ori = SPPF(in_channels=SPPF_in_channels,
-                             out_channels=SPPF_out_channels)
-                
+        neck_out_channels = [
+            max(64, int(neck_in_channels[0] / 2)),
+            max(128, int(neck_in_channels[1] / 2)),
+            max(256, int(neck_in_channels[2] / 2))
+        ]
         
-        neck_out_channels = [40, 80, SPPF_out_channels]
-        
-        # self.chennel_align = Align(in_channels=neck_in_channels, out_channels=neck_out_channels)
+        self.chennel_align = Align(in_channels=neck_in_channels, out_channels=neck_out_channels)
         
         self.neck = SFPN(in_channels=neck_out_channels, fuse_mode="cat", SE=config["SE"])
         
@@ -47,10 +44,7 @@ class Mobile_SPEEDv3(nn.Module):
     def forward_once(self, x: Tensor):
         p3, p4, p5 = self.features(x)
         
-        # p3, p4, p5 = self.chennel_align([p3, p4, p5])
-        
-        p5_pos = self.SPPF_pos(p5)
-        p5_ori = self.SPPF_ori(p5)
+        p3, p4, p5_pos, p5_ori = self.chennel_align([p3, p4, p5])
         
         pos_fs, ori_fs = self.neck([p3, p4, p5_pos, p5_ori])
         p3_pos, p4_pos, p5_pos = pos_fs
