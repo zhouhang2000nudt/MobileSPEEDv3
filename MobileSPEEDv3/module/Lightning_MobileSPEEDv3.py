@@ -19,8 +19,8 @@ class LightningMobileSPEEDv3(L.LightningModule):
         # 配置
         self.config: dict = config
         # 模型
-        # self.model: Mobile_SPEEDv3 = Mobile_SPEEDv3(self.config)
-        self.model: Mobile_SPEEDv3 = Mobile_SPEEDv3_timm(self.config)
+        self.model: Mobile_SPEEDv3 = Mobile_SPEEDv3(self.config)
+        # self.model: Mobile_SPEEDv3 = Mobile_SPEEDv3_timm(self.config)
         # 欧拉角编码解码器
         self.ori_encoder_decoder: OriEncoderDecoder = OriEncoderDecoder(self.config["stride"], self.config["ratio"], neighbour=self.config["neighbor"], device="cuda" if config["accelerator"] == "gpu" else config["accelerator"])
         # 损失函数

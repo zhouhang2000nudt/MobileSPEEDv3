@@ -2,10 +2,8 @@ import sys
 sys.path.insert(0, sys.path[0]+"/../")
 
 import torch
-import torch.nn as nn
 
 import timm
-import torchvision.models as models
 
 from rich import print
 from ptflops import get_model_complexity_info

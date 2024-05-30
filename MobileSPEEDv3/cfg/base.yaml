@@ -17,14 +17,14 @@ self_supervised: false
 
 
 # =========================dataset=========================
-data_dir: ../../gemini/data-1/datasets/speed     # 数据路径
+data_dir: ../datasets/speed     # 数据路径
 workers: 20            # dataloader workers
 ram: true            # 是否使用内存加载数据
 imgsz: [240, 384]     # 图片大小 [480, 768]
 
 
 # ==========================model==========================
-backbone: repvit_m0_9.dist_450e_in1k
+backbone: rexnet_200.nav_in1k         # 100/130/150/200
 SE: true
 pos_dim: 3                             # 位置维度
 stride: 5                             # 步长 度
@@ -73,7 +73,7 @@ Augmentation:
 Rotate:
   Rotate_img: true
   img_angle: 90
-  p: 1.0             # p为图片旋转的概率，(1-p)为相机旋转的概率
+  p: 1.0             # p为图片旋转的概率
 
 CropAndPad:
   p: 0.5

@@ -17,19 +17,6 @@ class Mobile_SPEEDv3_timm(nn.Module):
         
         chennels = self.features.feature_info.channels()
         
-        # if self.backbone == "mobilenetv3_large_100.ra_in1k":
-        #     self.features = timm.create_model(config["backbone"], pretrained=config["pretrained"], features_only=True, out_indices=[2, 3, 4])
-        # elif self.backbone == "rexnet_150.nav_in1k":
-        #     self.features = timm.create_model(config["backbone"], pretrained=config["pretrained"], features_only=True, out_indices=[2, 3, 4])
-        # elif self.backbone == "resnet18.a1_in1k":
-        #     self.features = timm.create_model(config["backbone"], pretrained=config["pretrained"], features_only=True, out_indices=[2, 3, 4])
-        # elif self.backbone == "efficientnet_b4.ra2_in1k":
-        #     self.features = timm.create_model(config["backbone"], pretrained=config["pretrained"], features_only=True, out_indices=[2, 3, 4])
-        # elif self.backbone == "efficientnetv2_rw_s.ra2_in1k":
-        #     self.features = timm.create_model(config["backbone"], pretrained=config["pretrained"], features_only=True, out_indices=[2, 3, 4])
-        # elif self.backbone == "resnet34d.ra2_in1k":
-        #     self.features = timm.create_model(config["backbone"], pretrained=config["pretrained"], features_only=True, out_indices=[2, 3, 4])
-        
         self.ECP_pos = ECP(in_channels=chennels, expand_ratio=config["expand_ratio"], pool_size=config["pool_size"])
         self.ECP_ori = ECP(in_channels=chennels, expand_ratio=config["expand_ratio"], pool_size=config["pool_size"])
         

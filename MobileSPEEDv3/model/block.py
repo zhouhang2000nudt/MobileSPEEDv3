@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import math
+import timm
 
 from typing import List, Union
 from .RepVGG import RepVGGplusBlock

@@ -1,57 +1,33 @@
 import torch
 import torch.nn as nn
+import timm
 
 from typing import List, Union
 from torch import Tensor
 
-from .block import SPPF, FPNPAN, RepECPHead, DCNv2, ShortBiFPN, SFPN, Head_single, ECP, RSC, Align
-from torchvision.models import mobilenet_v3_large, MobileNet_V3_Large_Weights, mobilenet_v3_small, MobileNet_V3_Small_Weights
-from torchvision.models import efficientnet_b1, EfficientNet_B1_Weights
-from torchvision.models import regnet_y_1_6gf, RegNet_Y_1_6GF_Weights
+from .block import SPPF, FPNPAN, SFPN, Head_single, ECP, RSC, Align
 
 class Mobile_SPEEDv3(nn.Module):
     def __init__(self, config: dict):
         super(Mobile_SPEEDv3, self).__init__()
         
         self.backbone = config["backbone"]
+        self.features = timm.create_model(config["backbone"], pretrained=config["pretrained"], features_only=True, out_indices=[-3, -2, -1])
         
-        if config["backbone"] == "mobilenet_v3_large":
-            if config["pretrained"]:
-                self.features = mobilenet_v3_large(weights = MobileNet_V3_Large_Weights.DEFAULT).features[:-1]
-            else:
-                self.features = mobilenet_v3_large().features[:-1]
-        elif config["backbone"] == "mobilenet_v3_small":
-            if config["pretrained"]:
-                self.features = mobilenet_v3_small(weights = MobileNet_V3_Small_Weights.DEFAULT).features[:-1]
-            else:
-                self.features = mobilenet_v3_small().features[:-1]
-        elif config["backbone"] == "efficientnet_b1":
-            if config["pretrained"]:
-                self.features = efficientnet_b1(weights = EfficientNet_B1_Weights.DEFAULT).features[:-1]
-            else:
-                self.features = efficientnet_b1().features[:-1]
-        if config["backbone"] == "mobilenet_v3_large":
-            SPPF_in_channels = 160
-            SPPF_out_channels = 160
-        elif config["backbone"] == "mobilenet_v3_small":
-            pass
-        elif config["backbone"] == "efficientnet_b1":
-            SPPF_in_channels = 320
-            SPPF_out_channels = 320
+        neck_in_channels = self.features.feature_info.channels()
+        
+        SPPF_in_channels =neck_in_channels[-1] 
+        SPPF_out_channels = SPPF_in_channels
+
         self.SPPF_pos = SPPF(in_channels=SPPF_in_channels,
                              out_channels=SPPF_out_channels)
         self.SPPF_ori = SPPF(in_channels=SPPF_in_channels,
                              out_channels=SPPF_out_channels)
                 
-        if config["backbone"] == "mobilenet_v3_large":
-            neck_in_channels = [40, 112, SPPF_out_channels]
-        elif config["backbone"] == "mobilenet_v3_small":
-            pass
-        elif config["backbone"] == "efficientnet_b1":
-            neck_in_channels = [112, 192, SPPF_out_channels]
-        neck_out_channels = [40, 80, 160]
         
-        self.chennel_align = Align(in_channels=neck_in_channels, out_channels=neck_out_channels)
+        neck_out_channels = [40, 80, SPPF_out_channels]
+        
+        # self.chennel_align = Align(in_channels=neck_in_channels, out_channels=neck_out_channels)
         
         self.neck = SFPN(in_channels=neck_out_channels, fuse_mode="cat", SE=config["SE"])
         
@@ -67,22 +43,9 @@ class Mobile_SPEEDv3(nn.Module):
         self.roll_head = Head_single(head_in_features, dim=int(360 // config["stride"] + 1 + 2 * config["neighbor"]), softmax=True)
         
     def forward(self, x: Tensor):
-        # if self.backbone == "mobilenet_v3_large":
-        #     p3 = self.features[:7](x)
-        #     p4 = self.features[7:13](p3)
-        #     p5 = self.features[13:](p4)
-        # elif self.backbone == "mobilenet_v3_small":
-        #     pass
-        # elif self.backbone == "efficientnet_b1":
-        #     p3 = self.features[:6](x)
-        #     p4 = self.features[:7](x)
-        #     p5 = self.features[:8](x)
+        p3, p4, p5 = self.features(x)
         
-        p3 = self.features[:7](x)
-        p4 = self.features[7:13](p3)
-        p5 = self.features[13:](p4)
-        
-        p3, p4, p5 = self.chennel_align([p3, p4, p5])
+        # p3, p4, p5 = self.chennel_align([p3, p4, p5])
         
         p5_pos = self.SPPF_pos(p5)
         p5_ori = self.SPPF_ori(p5)

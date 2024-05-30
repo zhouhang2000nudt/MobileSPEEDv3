@@ -88,7 +88,7 @@ if __name__ == "__main__":
     elif config["summary"] == "default":
         summary = ModelSummary(max_depth=3)
     SWA = StochasticWeightAveraging(swa_lrs=config["lr_min"])
-    callbacks = [lr_monitor, checkpoint, summary, bar, SWA]
+    callbacks = [lr_monitor, checkpoint, summary, bar]
 
     # ===================plugins=================
     plugins = []
@@ -140,8 +140,8 @@ if __name__ == "__main__":
 
     # ====================模型====================
     # TODO Efficient initialization
-    with trainer.init_module():
-        module = LightningMobileSPEEDv3(config)
+    # with trainer.init_module():
+    module = LightningMobileSPEEDv3(config)
     
     # ====================数据====================
     dataloader = SpeedDataModule(config=config)
