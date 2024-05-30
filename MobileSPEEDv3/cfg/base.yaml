@@ -31,7 +31,7 @@ pos_dim: 3                             # 位置维度
 stride: 5                             # 步长 度
 sigma: 1                              # 标准差
 tau: 3                                
-pretrained: false
+pretrained: true
 deform_layers: []
 neck: SPAN                            # FPNPAN/BiFPN/AFPN/SFPN
 expand_ratio: [1, 1, 1]                 # 扩张率
