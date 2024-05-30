@@ -107,7 +107,7 @@ def prepare_Speed(config: dict):
         # 训练集的数据转化
         "train": {
             "transform": v2.Compose([
-                v2.ToTensor(),
+                v2.ToImage(), v2.ToDtype(torch.float32, scale=True),
             ]),
             "A_transform": A.Compose([
                 A.OneOf([
@@ -132,13 +132,13 @@ def prepare_Speed(config: dict):
         # 验证集的数据转化
         "val": {
             "transform": v2.Compose([
-                v2.ToTensor(),
+                v2.ToImage(), v2.ToDtype(torch.float32, scale=True),
             ]),
             "A_transform": None,
         },
         "self_supervised_train": {
             "transform": v2.Compose([
-                v2.ToTensor(),
+                v2.ToImage(), v2.ToDtype(torch.float32, scale=True),
             ]),
             "A_transform": [A.Compose([
                 A.Flip(p=0.5),
@@ -175,7 +175,7 @@ def prepare_Speed(config: dict):
         },
         "self_supervised_val": {
             "transform": v2.Compose([
-                v2.ToTensor(),
+                v2.ToImage(), v2.ToDtype(torch.float32, scale=True),
             ]),
             "A_transform": [A.Compose([
                 A.Flip(p=0.5),
@@ -229,7 +229,7 @@ def prepare_Speed(config: dict):
     
     # 设置姿态编码解码器
     # Speed.ori_encoder_decoder = OriEncoderDecoder(Speed.config["stride"], Speed.config["ratio"], Speed.config["neighbor"])
-    Speed.ori_encoder_decoder = OriEncoderDecoderGauss(Speed.config["stride"], Speed.config("sigma"), Speed.config["tau"])
+    Speed.ori_encoder_decoder = OriEncoderDecoderGauss(Speed.config["stride"], Speed.config["sigma"], Speed.config["tau"])
 
 
 class ImageReader(Thread):
@@ -277,7 +277,7 @@ class Speed(Dataset):
     val_index: Subset       # 验证集图片名列表
     test_index: list        # 测试集图片名列表
     img_dict: dict = {} # 图片字典
-    ori_encoder_decoder: OriEncoderDecoder
+    ori_encoder_decoder: OriEncoderDecoderGauss
     camera: Camera
     
 

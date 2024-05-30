@@ -26,7 +26,7 @@ class LightningMobileSPEEDv3(L.LightningModule):
         # self.model: Mobile_SPEEDv3 = Mobile_SPEEDv3_timm(self.config)
         # 欧拉角编码解码器
         # self.ori_encoder_decoder: OriEncoderDecoder = OriEncoderDecoder(self.config["stride"], self.config["ratio"], neighbour=self.config["neighbor"], device="cuda" if config["accelerator"] == "gpu" else config["accelerator"])
-        self.ori_encoder_decoder: OriEncoderDecoderGauss = OriEncoderDecoderGauss(self.config["stride"], self.config["sigma"], neighbour=self.config["tau"], device="cuda" if config["accelerator"] == "gpu" else config["accelerator"])
+        self.ori_encoder_decoder: OriEncoderDecoderGauss = OriEncoderDecoderGauss(self.config["stride"], self.config["sigma"], tau=self.config["tau"], device="cuda" if config["accelerator"] == "gpu" else config["accelerator"])
         # 损失函数
         self.pos_loss: PoseLoss = PoseLoss(self.config["pos_loss"])
         self.yaw_loss: EulerLoss = EulerLoss(self.config["euler_loss"])

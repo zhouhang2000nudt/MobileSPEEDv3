@@ -266,6 +266,10 @@ class OriEncoderDecoderGauss:
         self.pitch_range = torch.linspace(-self.extra * stride, 180 + self.extra * stride, self.pitch_len) - 90
         self.roll_range = torch.linspace(-self.extra * stride, 360 + self.extra * stride, self.roll_len) - 180
         
+        self.yaw_l = self.yaw_range[0].item()
+        self.pitch_l = self.pitch_range[0].item()
+        self.roll_l = self.roll_range[0].item()
+        
         self.yaw_range.requires_grad_(False)
         self.pitch_range.requires_grad_(False)
         self.roll_range.requires_grad_(False)
@@ -278,15 +282,15 @@ class OriEncoderDecoderGauss:
         # self.roll_index_dict = {int(roll // stride): i for i, roll in enumerate(self.roll_range)}
     
     def rho_sc(self, x, s, c):
-        return torch.exp(-(x - c)**2 / (2 * s**2))
+        return np.exp(-(x - c)**2 / (2 * s**2))
     
     def _encode_ori(self, angle: float, angle_len: Tensor, angle_l: float):
-        encode = torch.zeros(angle_len)
+        encode = np.zeros(angle_len)
         
         c = (angle - angle_l) / self.stride
-        l_index = int(torch.ceil(c - self.extra))
-        r_index = int(torch.floor(c + self.extra))
-        indexes = torch.arange(l_index, r_index + 1, 1)
+        l_index = int(np.ceil(c - self.extra))
+        r_index = int(np.floor(c + self.extra))
+        indexes = np.arange(l_index, r_index + 1, 1)
         
         rho = self.rho_sc(indexes, self.s, c)
         encode[l_index:r_index+1] = rho / rho.sum()
@@ -296,11 +300,10 @@ class OriEncoderDecoderGauss:
     def encode_ori(self, ori):
         rotation = R.from_quat([ori[1], ori[2], ori[3], ori[0]])
         yaw, pitch, roll = rotation.as_euler('YXZ', degrees=True)    # 偏航角、俯仰角、翻滚角
-        print(yaw, pitch, roll)
         
-        yaw_encode = self._encode_ori(yaw, self.yaw_len, self.yaw_range[0])
-        pitch_encode = self._encode_ori(pitch, self.pitch_len, self.pitch_range[0])
-        roll_encode = self._encode_ori(roll, self.roll_len, self.roll_range[0])
+        yaw_encode = self._encode_ori(yaw, self.yaw_len, self.yaw_l)
+        pitch_encode = self._encode_ori(pitch, self.pitch_len, self.pitch_l)
+        roll_encode = self._encode_ori(roll, self.roll_len, self.roll_l)
         return yaw_encode, pitch_encode, roll_encode
     
     def decode_ori(self, yaw_encode: Tensor, pitch_encode: Tensor, roll_encode: Tensor):

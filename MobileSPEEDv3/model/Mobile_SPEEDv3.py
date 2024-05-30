@@ -35,11 +35,12 @@ class Mobile_SPEEDv3(nn.Module):
         
         self.RSC = RSC()
         
+        extra = max([config["tau"] * config["sigma"], 3])
         head_in_features = sum([int(neck_out_channels[i] * config["expand_ratio"][i] * config["pool_size"][i]**2) for i in range(3)])
         self.pos_head = Head_single(head_in_features, dim=3)
-        self.yaw_head = Head_single(head_in_features, dim=int(360 // config["stride"] + 1 + 2 * config["neighbor"]), softmax=True)
-        self.pitch_head = Head_single(head_in_features, dim=int(180 // config["stride"] + 1 + 2 * config["neighbor"]), softmax=True)
-        self.roll_head = Head_single(head_in_features, dim=int(360 // config["stride"] + 1 + 2 * config["neighbor"]), softmax=True)
+        self.yaw_head = Head_single(head_in_features, dim=int(360 // config["stride"] + 1 + 2 * extra), softmax=True)
+        self.pitch_head = Head_single(head_in_features, dim=int(180 // config["stride"] + 1 + 2 * extra), softmax=True)
+        self.roll_head = Head_single(head_in_features, dim=int(360 // config["stride"] + 1 + 2 * extra), softmax=True)
         
     def forward_once(self, x: Tensor):
         p3, p4, p5 = self.features(x)
