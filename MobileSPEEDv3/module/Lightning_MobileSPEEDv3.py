@@ -23,6 +23,7 @@ class LightningMobileSPEEDv3(L.LightningModule):
             self.model: Mobile_SPEEDv3 = Mobile_SPEEDv3(self.config)
         else:
             self.model: Mobile_SPEEDv3_timm = Mobile_SPEEDv3_timm(self.config)
+        self.model = torch.compile(self.model)
         # self.model: Mobile_SPEEDv3 = Mobile_SPEEDv3_timm(self.config)
         # 欧拉角编码解码器
         # self.ori_encoder_decoder: OriEncoderDecoder = OriEncoderDecoder(self.config["stride"], self.config["ratio"], neighbour=self.config["neighbor"], device="cuda" if config["accelerator"] == "gpu" else config["accelerator"])
@@ -72,6 +73,7 @@ class LightningMobileSPEEDv3(L.LightningModule):
     def training_step(self, batch, batch_idx):
         if self.config["self_supervised"]:
             image_1, image_2 = batch
+            num = image_1.shape[0]
             pos_1, yaw_1, pitch_1, roll_1 = self(image_1)
             pos_2, yaw_2, pitch_2, roll_2 = self(image_2)
             train_pos_loss = self.pos_loss(pos_1, pos_2)
@@ -125,6 +127,7 @@ class LightningMobileSPEEDv3(L.LightningModule):
         # 取出数据
         if self.config["self_supervised"]:
             image_1, image_2 = batch
+            num = image_1.shape[0]
             pos_1, yaw_1, pitch_1, roll_1 = self(image_1)
             pos_2, yaw_2, pitch_2, roll_2 = self(image_2)
             val_pos_loss = self.pos_loss(pos_1, pos_2)
